@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Lettre H stylisée -->
+    <path
+        android:fillColor="#1683FF"
+        android:pathData="M30,30h10v18h28V30h10v48H68V58H40v20H30z" />
+    <!-- Ligne d'horizon -->
+    <path
+        android:fillColor="#FF2E55"
+        android:pathData="M28,84h52v4H28z" />
+</vector>

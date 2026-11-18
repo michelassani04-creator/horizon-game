@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="horizon_background">#0A0E17</color>
+    <color name="horizon_blue">#1683FF</color>
+    <color name="horizon_red">#FF2E55</color>
+    <color name="horizon_surface">#161F30</color>
+    <color name="horizon_surface_variant">#26354A</color>
+</resources>

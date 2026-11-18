@@ -1,0 +1,44 @@
+package com.horizon.game.ui.theme
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+
+private val HorizonColorScheme = darkColorScheme(
+    primary = HorizonBlue,
+    onPrimary = HorizonOnSurface,
+    secondary = HorizonRed,
+    onSecondary = HorizonOnSurface,
+    background = HorizonBackground,
+    onBackground = HorizonOnSurface,
+    surface = HorizonSurface,
+    onSurface = HorizonOnSurface,
+    surfaceVariant = HorizonSurfaceVariant,
+    onSurfaceVariant = HorizonOnSurfaceMuted,
+    error = HorizonRed
+)
+
+// Police système proche d'Inter (§8) ; tailles en sp pour respecter la taille de police système.
+private val HorizonTypography = Typography(
+    headlineLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 36.sp),
+    headlineMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 30.sp),
+    titleLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
+    titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
+    bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp),
+    bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
+    labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp)
+)
+
+@Composable
+fun HorizonTheme(content: @Composable () -> Unit) {
+    MaterialTheme(
+        colorScheme = HorizonColorScheme,
+        typography = HorizonTypography,
+        content = content
+    )
+}
