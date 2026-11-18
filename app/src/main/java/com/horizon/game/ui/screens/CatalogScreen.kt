@@ -6,13 +6,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -69,15 +72,17 @@ fun CatalogScreen(
         }
         Text(
             "Données de démonstration (titres fictifs).",
-            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
-            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (games.isEmpty()) {
             EmptyState("Aucun résultat", "Essaie un autre titre ou retire le filtre de catégorie.")
         } else {
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(300.dp),
                 contentPadding = PaddingValues(vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(games, key = { it.id }) { game ->
                     GameCard(game, appState.isFavorite(game.id), onClick = { onOpenGame(game.id) })

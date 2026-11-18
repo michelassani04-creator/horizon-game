@@ -30,7 +30,9 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode|keyboardHidden|keyboard|navigation"
+            android:screenOrientation="fullUser"
+            android:resizeableActivity="true"
             android:theme="@style/Theme.HorizonGame">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

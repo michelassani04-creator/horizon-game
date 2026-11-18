@@ -24,6 +24,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.horizon.game.data.SampleCatalog
 import com.horizon.game.ui.AppState
@@ -51,7 +52,12 @@ fun GameDetailScreen(gameId: String, appState: AppState, onBack: () -> Unit) {
             EmptyState("Jeu introuvable", "Cette fiche n'existe pas ou n'est plus disponible.", Modifier.padding(padding))
             return@Scaffold
         }
+        val context = LocalContext.current
         val favorite = appState.isFavorite(game.id)
+        // Règle §4.1 : « Jouer » seulement si l'application est détectée et lançable.
+        val playable = game.packageName?.let { pkg ->
+            appState.installed.any { it.packageName == pkg }
+        } == true
         Column(
             Modifier
                 .fillMaxSize()
@@ -68,8 +74,10 @@ fun GameDetailScreen(gameId: String, appState: AppState, onBack: () -> Unit) {
             InfoRow("Compatibilité", game.compatibility.label)
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Règle §4.1 : « Jouer » seulement si l'application est détectée et lançable (Lot 2).
-                Button(onClick = {}, enabled = false) {
+                Button(
+                    onClick = { game.packageName?.let { appState.launchGame(context, it) } },
+                    enabled = playable
+                ) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null)
                     Text("Jouer")
                 }
@@ -82,7 +90,7 @@ fun GameDetailScreen(gameId: String, appState: AppState, onBack: () -> Unit) {
                 }
             }
             Text(
-                "Le bouton « Jouer » s'active quand le jeu installé est détecté (Lot 2).",
+                "Le bouton « Jouer » s'active quand le jeu est détecté comme installé sur cet appareil.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

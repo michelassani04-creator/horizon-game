@@ -44,13 +44,14 @@ import androidx.compose.ui.unit.dp
 import com.horizon.game.ui.components.EmptyState
 
 private fun connectedControllers(): List<String> =
-    InputDevice.getDeviceIds().toList().mapNotNull { id: Int -> InputDevice.getDevice(id) }
-        .filter { device ->
-            val sources = device.sources
+    InputDevice.getDeviceIds().toList()
+        .mapNotNull { id: Int -> InputDevice.getDevice(id) }
+        .filter { device: InputDevice ->
+            val sources: Int = device.sources
             (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
                 (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
         }
-        .map { it.name }
+        .map { device: InputDevice -> device.name }
 
 /**
  * Écran de test des manettes (F-010) : détecte les manettes connectées

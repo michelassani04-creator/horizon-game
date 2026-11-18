@@ -51,17 +51,21 @@ fun SettingsScreen(appState: AppState, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             SettingSwitch("Notifications", appState.notificationsEnabled.value) {
-                appState.notificationsEnabled.value = it
+                appState.setNotifications(it)
             }
             SettingSwitch("Réduire les animations", appState.reduceAnimations.value) {
-                appState.reduceAnimations.value = it
+                appState.setReduceAnimations(it)
+            }
+            SettingSwitch("Afficher toutes les applications (test)", appState.showAllApps.value) {
+                appState.setShowAllApps(it)
             }
             SettingInfo("Langue", "Français")
             SettingInfo("Thème", "Sombre (HORIZON)")
             SettingInfo("Confidentialité", "Aucune donnée collectée en Lot 1. Politique complète avant le lancement public.")
-            SettingInfo("Version", "0.1.0 (Lot 1)")
+            SettingInfo("Version", "0.2.0 (Lot 2)")
             Text(
-                "Les préférences sont conservées en mémoire pour l'instant ; elles seront enregistrées puis synchronisées aux Lots 2 et 3.",
+                "Les préférences, favoris et jeux récents sont enregistrés sur cet appareil ; la synchronisation avec ton compte arrive au Lot 3. " +
+                    "L'option « toutes les applications » sert à tester le lancement quand aucun jeu n'est installé.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
