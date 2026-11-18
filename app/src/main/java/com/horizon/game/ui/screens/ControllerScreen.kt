@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.horizon.game.ui.components.EmptyState
 
 private fun connectedControllers(): List<String> =
-    InputDevice.getDeviceIds().mapNotNull { InputDevice.getDevice(it) }
+    InputDevice.getDeviceIds().toList().mapNotNull { id: Int -> InputDevice.getDevice(id) }
         .filter { device ->
             val sources = device.sources
             (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
