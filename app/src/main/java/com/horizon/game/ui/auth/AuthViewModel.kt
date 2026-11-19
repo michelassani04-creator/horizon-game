@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.horizon.game.data.Prefs
+import com.horizon.game.data.ServerConfig
 import com.horizon.game.data.auth.SessionStore
 import com.horizon.game.data.remote.ApiClient
 import com.horizon.game.data.remote.ApiException
@@ -21,7 +22,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     private val store = SessionStore(app)
     private val api = ApiClient { serverUrl }
 
-    var serverUrl by mutableStateOf(prefs.string("server_url", ""))
+    var serverUrl by mutableStateOf(ServerConfig.url(prefs))
         private set
     var user by mutableStateOf(store.user())
         private set
@@ -31,6 +32,9 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var info by mutableStateOf<String?>(null)
         private set
+
+    /** Adresse saisie à la main (version de test) ; vide = adresse intégrée à l'application. */
+    val serverOverride: String get() = prefs.string("server_url", "")
 
     val isLoggedIn: Boolean get() = user != null
 
@@ -55,8 +59,8 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveServerUrl(value: String) {
-        serverUrl = value.trim().trimEnd('/')
-        prefs.saveString("server_url", serverUrl)
+        prefs.saveString("server_url", value.trim().trimEnd('/'))
+        serverUrl = ServerConfig.url(prefs)
         clearMessages()
     }
 

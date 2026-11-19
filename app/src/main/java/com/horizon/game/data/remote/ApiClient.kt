@@ -21,7 +21,7 @@ class ApiClient(private val baseUrl: () -> String) {
         withContext(Dispatchers.IO) {
             val base = baseUrl().trim().trimEnd('/')
             if (base.isEmpty()) {
-                throw ApiException("no_server", "Serveur non configuré. Renseigne son adresse dans Réglages › Serveur.")
+                throw ApiException("no_server", "Cette version de l'application n'a pas de serveur intégré.")
             }
             if (!base.startsWith("https://") && !base.startsWith("http://")) {
                 throw ApiException("bad_url", "Adresse du serveur invalide : elle doit commencer par https://")
@@ -33,8 +33,9 @@ class ApiClient(private val baseUrl: () -> String) {
             }
             try {
                 conn.requestMethod = method
-                conn.connectTimeout = 10_000
-                conn.readTimeout = 15_000
+                // Délais longs : un serveur gratuit en veille met environ une minute à se réveiller.
+                conn.connectTimeout = 30_000
+                conn.readTimeout = 70_000
                 conn.setRequestProperty("Accept", "application/json")
                 if (token != null) conn.setRequestProperty("Authorization", "Bearer $token")
                 if (body != null) {

@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.horizon.game.data.Prefs
+import com.horizon.game.data.ServerConfig
 import com.horizon.game.data.remote.ApiClient
 import com.horizon.game.data.remote.ApiException
 import com.horizon.game.data.remote.gameFromJson
@@ -21,7 +22,7 @@ import org.json.JSONException
  */
 class CatalogViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = Prefs(app)
-    private val api = ApiClient { prefs.string("server_url", "") }
+    private val api = ApiClient { ServerConfig.url(prefs) }
 
     var games by mutableStateOf(parse(prefs.string("catalog_cache", "")))
         private set

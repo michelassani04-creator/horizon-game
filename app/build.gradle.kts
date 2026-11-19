@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Adresse du serveur HORIZON intégrée à l'application : propriété Gradle ou variable d'environnement HORIZON_API_URL.
+val horizonApiUrl: String = listOf(project.findProperty("HORIZON_API_URL") as String?, System.getenv("HORIZON_API_URL"))
+    .firstOrNull { !it.isNullOrBlank() }?.trim()?.trimEnd('/') ?: ""
+
 android {
     namespace = "com.horizon.game"
     compileSdk = 34
@@ -12,8 +16,9 @@ android {
         applicationId = "com.horizon.game"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "0.3.2"
+        versionCode = 7
+        versionName = "0.3.3"
+        buildConfigField("String", "API_URL", "\"$horizonApiUrl\"")
     }
 
     buildTypes {
@@ -35,6 +40,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"

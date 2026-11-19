@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.horizon.game.BuildConfig
 import com.horizon.game.ui.AppState
 import com.horizon.game.ui.components.OsSwitchRow
 import com.horizon.game.ui.components.osClickable
@@ -101,28 +102,34 @@ fun SettingsScreen(
                     )
                 }
                 2 -> {
-                    var url by rememberSaveable { mutableStateOf(auth.serverUrl) }
-                    Text(
-                        "Adresse du serveur HORIZON (HTTPS). Elle est fournie par l'équipe HORIZON une fois le serveur en ligne.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = HorizonOnSurfaceMuted
-                    )
-                    OutlinedTextField(
-                        value = url,
-                        onValueChange = { url = it },
-                        label = { Text("https://api.exemple.com") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { auth.saveServerUrl(url) }) { Text("Enregistrer") }
-                        OutlinedButton(
-                            enabled = !auth.busy,
-                            onClick = { auth.saveServerUrl(url); auth.testServer() }
-                        ) { Text("Tester la connexion") }
+                    if (BuildConfig.DEBUG) {
+                        var url by rememberSaveable { mutableStateOf(auth.serverOverride) }
+                        Text(
+                            "Version de test : l'application se connecte automatiquement à " +
+                                (BuildConfig.API_URL.ifBlank { "(aucun serveur intégré)" }) +
+                                ". Tu peux la remplacer ici ; laisse vide pour garder l'adresse intégrée.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = HorizonOnSurfaceMuted
+                        )
+                        OutlinedTextField(
+                            value = url,
+                            onValueChange = { url = it },
+                            label = { Text("Adresse de remplacement (optionnel)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { auth.saveServerUrl(url) }) { Text("Enregistrer") }
+                            OutlinedButton(
+                                enabled = !auth.busy,
+                                onClick = { auth.saveServerUrl(url); auth.testServer() }
+                            ) { Text("Tester la connexion") }
+                        }
+                        auth.error?.let { Text(it, color = HorizonRed, style = MaterialTheme.typography.bodyMedium) }
+                        auth.info?.let { Text(it, color = HorizonBlue, style = MaterialTheme.typography.bodyMedium) }
+                    } else {
+                        Info("Connexion", "HORIZON GAME se connecte automatiquement à ses serveurs. Rien à régler.")
                     }
-                    auth.error?.let { Text(it, color = HorizonRed, style = MaterialTheme.typography.bodyMedium) }
-                    auth.info?.let { Text(it, color = HorizonBlue, style = MaterialTheme.typography.bodyMedium) }
                 }
                 3 -> {
                     Text(
@@ -146,7 +153,7 @@ fun SettingsScreen(
                 }
                 else -> {
                     Info("Application", "HORIZON GAME")
-                    Info("Version", "0.3.2 (Lot 3)")
+                    Info("Version", "0.3.3 (Lot 3)")
                     Info("Identifiant", "com.horizon.game")
                 }
             }
