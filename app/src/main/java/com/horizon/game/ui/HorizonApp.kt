@@ -156,7 +156,7 @@ fun HorizonApp(resumeTick: Int) {
     // Catalogue : rechargé au retour dans l'application et quand l'adresse du serveur change.
     LaunchedEffect(resumeTick, auth.serverUrl) { catalogVm.refresh() }
     LaunchedEffect(catalogVm.games) {
-        appState.setCatalog(catalogVm.games)
+        appState.updateCatalog(catalogVm.games)
         appState.refreshInstalled(context)
     }
 

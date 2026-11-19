@@ -33,7 +33,7 @@ class AppState(private val prefs: Prefs) {
     var catalog by mutableStateOf<List<Game>>(emptyList())
         private set
 
-    fun setCatalog(games: List<Game>) {
+    fun updateCatalog(games: List<Game>) {
         catalog = games
     }
 
