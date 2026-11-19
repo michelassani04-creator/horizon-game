@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,10 +36,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.horizon.game.data.SampleCatalog
 import com.horizon.game.domain.model.Game
 import com.horizon.game.domain.model.GameCategory
 import com.horizon.game.ui.AppState
+import com.horizon.game.ui.catalog.CatalogViewModel
 import com.horizon.game.ui.components.EmptyState
 import com.horizon.game.ui.components.GameTile
 import com.horizon.game.ui.components.SectionTitle
@@ -53,17 +54,18 @@ import com.horizon.game.ui.theme.HorizonOnSurfaceMuted
 @Composable
 fun StoreScreen(
     appState: AppState,
+    catalog: CatalogViewModel,
     onOpenGame: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val games = SampleCatalog.games.filter { game ->
+    val games = appState.catalog.filter { game ->
         game.title.contains(query, ignoreCase = true) &&
             (category == null || game.category.name == category)
     }
-    val featured = SampleCatalog.games.firstOrNull { it.featured }
+    val featured = appState.catalog.firstOrNull { it.featured }
 
     Column(modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(
@@ -101,7 +103,21 @@ fun StoreScreen(
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }) { SectionTitle("Tous les jeux") }
-            if (games.isEmpty()) {
+            if (appState.catalog.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column {
+                        EmptyState(
+                            if (catalog.loading) "Chargement du Store…" else "Le Store est vide",
+                            catalog.message ?: "Aucun jeu n'est publié pour le moment."
+                        )
+                        OutlinedButton(
+                            onClick = { catalog.refresh() },
+                            enabled = !catalog.loading,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        ) { Text("Réessayer") }
+                    }
+                }
+            } else if (games.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState("Aucun résultat", "Essaie un autre titre ou retire le filtre de catégorie.")
                 }
@@ -116,13 +132,6 @@ fun StoreScreen(
                         onClick = { onOpenGame(game.id) }
                     )
                 }
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    "Catalogue de démonstration : titres fictifs, publication des vrais jeux avec le Lot 3.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = HorizonOnSurfaceMuted
-                )
             }
         }
     }

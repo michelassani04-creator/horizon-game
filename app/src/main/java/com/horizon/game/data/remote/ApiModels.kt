@@ -1,5 +1,8 @@
 package com.horizon.game.data.remote
 
+import com.horizon.game.domain.model.Compatibility
+import com.horizon.game.domain.model.Game
+import com.horizon.game.domain.model.GameCategory
 import org.json.JSONObject
 
 /** Profil HORIZON ID tel que renvoyé par le serveur. */
@@ -33,3 +36,19 @@ data class UserInfo(
         )
     }
 }
+
+/** Convertit un jeu JSON du serveur ; lève une exception si un champ obligatoire manque ou est inconnu. */
+fun gameFromJson(o: JSONObject) = Game(
+    id = o.getString("id"),
+    title = o.getString("title"),
+    publisher = o.getString("publisher"),
+    category = GameCategory.valueOf(o.getString("category")),
+    description = o.optString("description", ""),
+    ageRating = o.optString("ageRating", ""),
+    sizeMb = o.optInt("sizeMb", 0),
+    compatibility = runCatching { Compatibility.valueOf(o.getString("compatibility")) }.getOrDefault(Compatibility.UNKNOWN),
+    packageName = o.stringOrNull("packageName"),
+    apkUrl = o.stringOrNull("apkUrl"),
+    apkSha256 = o.stringOrNull("apkSha256"),
+    featured = o.optBoolean("featured", false)
+)

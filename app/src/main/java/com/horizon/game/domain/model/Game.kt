@@ -28,6 +28,9 @@ data class Game(
     val compatibility: Compatibility,
     /** Nom de paquet Android du jeu : sert à savoir s'il est installé et à le lancer. */
     val packageName: String? = null,
+    /** Adresse de téléchargement de l'APK et son empreinte SHA-256 (vérifiée avant installation). */
+    val apkUrl: String? = null,
+    val apkSha256: String? = null,
     /** Mis en avant dans la bannière du Store. */
     val featured: Boolean = false
 )

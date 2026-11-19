@@ -9,7 +9,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.horizon.game.data.GameScanner
 import com.horizon.game.data.Prefs
-import com.horizon.game.data.SampleCatalog
 import com.horizon.game.domain.model.Game
 
 /**
@@ -30,6 +29,16 @@ class AppState(private val prefs: Prefs) {
     var installedPackages by mutableStateOf<Set<String>>(emptySet())
         private set
 
+    /** Catalogue du Store reçu du serveur (ou gardé en cache hors-ligne). Vide tant qu'aucun serveur n'est joignable. */
+    var catalog by mutableStateOf<List<Game>>(emptyList())
+        private set
+
+    fun setCatalog(games: List<Game>) {
+        catalog = games
+    }
+
+    fun gameById(id: String): Game? = catalog.firstOrNull { it.id == id }
+
     val notificationsEnabled = mutableStateOf(prefs.bool("notifications", true))
     val reduceAnimations = mutableStateOf(prefs.bool("reduce_animations", false))
 
@@ -41,7 +50,7 @@ class AppState(private val prefs: Prefs) {
 
     /** Jeux du Store installés sur cet appareil : le contenu de la bibliothèque. */
     val installedGames: List<Game>
-        get() = SampleCatalog.games.filter { isInstalled(it) }
+        get() = catalog.filter { isInstalled(it) }
 
     fun isFavorite(id: String): Boolean = favorites.contains(id)
 
@@ -61,7 +70,7 @@ class AppState(private val prefs: Prefs) {
     }
 
     suspend fun refreshInstalled(context: Context) {
-        val storePackages = SampleCatalog.games.mapNotNull { it.packageName }.toSet()
+        val storePackages = catalog.mapNotNull { it.packageName }.toSet()
         installedPackages = GameScanner.installedStorePackages(context, storePackages)
     }
 

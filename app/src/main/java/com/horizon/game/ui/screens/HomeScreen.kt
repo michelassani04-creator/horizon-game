@@ -48,7 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.horizon.game.data.SampleCatalog
 import com.horizon.game.domain.model.Game
 import com.horizon.game.ui.AppState
 import com.horizon.game.ui.components.GameTile
@@ -101,11 +100,11 @@ fun HomeScreen(
 
     val mine = appState.installedGames
     val recentTiles = appState.recent
-        .mapNotNull { id -> SampleCatalog.byId(id) }
+        .mapNotNull { id -> appState.gameById(id) }
         .filter { appState.isInstalled(it) }
         .map { it.toTile(true) }
     val mineTiles = mine.map { it.toTile(true) }
-    val storeTiles = SampleCatalog.games.filter { !appState.isInstalled(it) }.map { it.toTile(false) }
+    val storeTiles = appState.catalog.filter { !appState.isInstalled(it) }.map { it.toTile(false) }
     val allTiles = recentTiles + mineTiles + storeTiles + soonTiles
 
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -117,7 +116,7 @@ fun HomeScreen(
 
     fun activate(tile: Tile) {
         when (tile.kind) {
-            Kind.INSTALLED -> SampleCatalog.byId(tile.key)?.let { appState.launchGame(context, it) }
+            Kind.INSTALLED -> appState.gameById(tile.key)?.let { appState.launchGame(context, it) }
             Kind.STORE -> onOpenGame(tile.key)
             Kind.SOON -> Unit
         }

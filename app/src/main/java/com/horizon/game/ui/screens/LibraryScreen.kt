@@ -25,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.horizon.game.data.SampleCatalog
 import com.horizon.game.ui.AppState
 import com.horizon.game.ui.components.EmptyState
 import com.horizon.game.ui.components.GameTile
@@ -45,7 +44,7 @@ fun LibraryScreen(
     var query by rememberSaveable { mutableStateOf("") }
 
     val installed = appState.installedGames.filter { it.title.contains(query, ignoreCase = true) }
-    val wishlist = SampleCatalog.games.filter {
+    val wishlist = appState.catalog.filter {
         appState.isFavorite(it.id) && !appState.isInstalled(it) && it.title.contains(query, ignoreCase = true)
     }
 

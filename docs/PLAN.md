@@ -15,7 +15,7 @@ Les écrans actuels sont conservés ; on remplace leur source de données (AppSt
 - 1.1 ✅ (v0.3.1) Couche réseau (HttpURLConnection + org.json, sans dépendance ; Ktor Client plus tard si besoin), `BASE_URL` configurable, gestion hors-ligne/erreurs.
 - 1.2 ✅ (v0.3.1) HORIZON ID : intro, inscription, connexion, jeton chiffré (Keystore), session, déconnexion.
 - 1.3 ViewModels + Hilt ; `AppState` réduit aux préférences locales.
-- 1.4 Catalogue depuis l'API ; **suppression de `SampleCatalog`** (états vides propres si serveur absent).
+- 1.4 ✅ (v0.3.2) Catalogue depuis l'API ; **suppression de `SampleCatalog`** (états vides propres si serveur absent).
 - 1.5 Qualité graphique : Haute / Standard / Économie (nombre de particules, vagues, FPS).
 - 1.6 Écrans restants : recherche dédiée, notifications, sécurité, centre d'assistance, téléchargements.
 

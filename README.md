@@ -18,7 +18,7 @@ Application Android (Kotlin + Jetpack Compose) du cahier des charges HORIZON GAM
 - Navigation à la manette : le D-pad déplace le focus (anneau bleu), OK valide
 
 ## Pour tester « Installé » et « Jouer »
-Dans `app/src/main/java/com/horizon/game/data/SampleCatalog.kt`, remplace le `packageName` d'une entrée par celui d'une application réellement installée sur ton téléphone. Elle apparaîtra comme installée et le bouton Jouer la lancera.
+Le catalogue vient du serveur (Réglages › Serveur). Publie un jeu avec `PUT /v1/admin/games/{id}` (voir `backend/README.md`) en mettant comme `packageName` celui d'une application installée sur ton téléphone : elle apparaîtra comme installée et le bouton Jouer la lancera. Aucun jeu n'est embarqué dans l'application.
 
 ## Pas encore fait
 | Lot | Contenu |

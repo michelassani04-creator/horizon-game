@@ -132,6 +132,7 @@ fun HorizonApp(resumeTick: Int) {
     val navController = rememberNavController()
     val appState = remember { AppState(Prefs(context)) }
     val auth: com.horizon.game.ui.auth.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val catalogVm: com.horizon.game.ui.catalog.CatalogViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
@@ -150,6 +151,13 @@ fun HorizonApp(resumeTick: Int) {
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             controller.hide(WindowInsetsCompat.Type.systemBars())
         }
+    }
+
+    // Catalogue : rechargé au retour dans l'application et quand l'adresse du serveur change.
+    LaunchedEffect(resumeTick, auth.serverUrl) { catalogVm.refresh() }
+    LaunchedEffect(catalogVm.games) {
+        appState.setCatalog(catalogVm.games)
+        appState.refreshInstalled(context)
     }
 
     BackHandler(enabled = panelOpen) { panelOpen = false }
@@ -195,7 +203,7 @@ fun HorizonApp(resumeTick: Int) {
                         )
                     }
                     composable(Routes.STORE) {
-                        StoreScreen(appState, onOpenGame = { navController.navigate(Routes.game(it)) })
+                        StoreScreen(appState, catalogVm, onOpenGame = { navController.navigate(Routes.game(it)) })
                     }
                     composable(Routes.LIBRARY) {
                         LibraryScreen(

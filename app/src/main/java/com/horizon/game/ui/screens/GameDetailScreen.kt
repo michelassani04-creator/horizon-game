@@ -26,7 +26,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.horizon.game.data.SampleCatalog
 import com.horizon.game.ui.AppState
 import com.horizon.game.ui.components.EmptyState
 import com.horizon.game.ui.components.GameCover
@@ -39,7 +38,7 @@ import com.horizon.game.ui.theme.HorizonOnSurfaceMuted
 /** Fiche d'un jeu du Store : visuel à gauche, informations et actions à droite. */
 @Composable
 fun GameDetailScreen(gameId: String, appState: AppState, onBack: () -> Unit) {
-    val game = SampleCatalog.byId(gameId)
+    val game = appState.gameById(gameId)
     val context = LocalContext.current
 
     OsPage(title = game?.title ?: "Jeu introuvable", onBack = onBack) {

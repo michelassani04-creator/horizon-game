@@ -146,7 +146,7 @@ fun SettingsScreen(
                 }
                 else -> {
                     Info("Application", "HORIZON GAME")
-                    Info("Version", "0.3.1 (Lot 3)")
+                    Info("Version", "0.3.2 (Lot 3)")
                     Info("Identifiant", "com.horizon.game")
                 }
             }
