@@ -16,6 +16,7 @@ enum class GameCategory(val label: String) {
     STRATEGY("Stratégie")
 }
 
+/** Jeu publié sur le HORIZON Store. */
 data class Game(
     val id: String,
     val title: String,
@@ -25,6 +26,8 @@ data class Game(
     val ageRating: String,
     val sizeMb: Int,
     val compatibility: Compatibility,
-    /** Nom de paquet Android, renseigné en Lot 2 pour détecter/lancer le jeu. */
-    val packageName: String? = null
+    /** Nom de paquet Android du jeu : sert à savoir s'il est installé et à le lancer. */
+    val packageName: String? = null,
+    /** Mis en avant dans la bannière du Store. */
+    val featured: Boolean = false
 )

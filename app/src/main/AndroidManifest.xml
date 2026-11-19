@@ -10,8 +10,9 @@
 
     <!-- Aucune permission sensible en Lot 1 (principe du moindre privilège). -->
 
-    <!-- Visibilité des paquets : uniquement les applications lançables (Lot 2),
-         sans QUERY_ALL_PACKAGES. -->
+    <!-- Visibilité des paquets : Android l'exige pour savoir si un jeu du HORIZON Store est
+         installé et pour le lancer. L'appli compare uniquement avec les paquets du Store
+         et ignore toutes les autres applications. Pas de QUERY_ALL_PACKAGES. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -31,7 +32,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode|keyboardHidden|keyboard|navigation"
-            android:screenOrientation="fullUser"
+            android:screenOrientation="sensorLandscape"
             android:resizeableActivity="true"
             android:theme="@style/Theme.HorizonGame">
             <intent-filter>

@@ -71,7 +71,7 @@ fun SplashScreen(onFinished: () -> Unit) {
             val w = size.width
             val h = size.height
             val cx = w / 2f
-            val horizonY = h * 0.56f
+            val horizonY = h * 0.50f
 
             // Halo qui se lève sur l'horizon
             val radius = minOf(w, h) * 0.60f * sunIn
@@ -118,7 +118,7 @@ fun SplashScreen(onFinished: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(top = maxHeight * 0.60f),
+                .padding(top = maxHeight * 0.54f),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(

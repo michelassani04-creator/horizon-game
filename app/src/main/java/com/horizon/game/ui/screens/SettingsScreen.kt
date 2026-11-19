@@ -1,94 +1,135 @@
 package com.horizon.game.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.horizon.game.ui.AppState
+import com.horizon.game.ui.components.OsSwitchRow
+import com.horizon.game.ui.components.osClickable
+import com.horizon.game.ui.theme.HorizonBlue
+import com.horizon.game.ui.theme.HorizonOnSurface
+import com.horizon.game.ui.theme.HorizonOnSurfaceMuted
+import com.horizon.game.ui.theme.HorizonSurface
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val sections = listOf("Affichage", "Notifications", "Manette", "Confidentialité", "À propos")
+
+/** Réglages « système » : catégories à gauche, contenu de la catégorie à droite. */
 @Composable
-fun SettingsScreen(appState: AppState, onBack: () -> Unit) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Paramètres") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        }
-    ) { padding ->
+fun SettingsScreen(
+    appState: AppState,
+    onOpenController: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var section by rememberSaveable { mutableStateOf(0) }
+
+    Row(
+        modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
         Column(
             Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
+                .weight(0.32f)
+                .fillMaxHeight()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            SettingSwitch("Notifications", appState.notificationsEnabled.value) {
-                appState.setNotifications(it)
+            sections.forEachIndexed { index, label ->
+                val selected = index == section
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (selected) HorizonOnSurface else HorizonOnSurfaceMuted,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .osClickable(RoundedCornerShape(12.dp)) { section = index }
+                        .background(if (selected) HorizonBlue.copy(alpha = 0.22f) else Color.Transparent)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                )
             }
-            SettingSwitch("Réduire les animations", appState.reduceAnimations.value) {
-                appState.setReduceAnimations(it)
+        }
+        Column(
+            Modifier
+                .weight(0.68f)
+                .fillMaxHeight()
+                .background(HorizonSurface, RoundedCornerShape(20.dp))
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            when (section) {
+                0 -> {
+                    OsSwitchRow("Réduire les animations", appState.reduceAnimations.value) {
+                        appState.setReduceAnimations(it)
+                    }
+                    Info("Langue", "Français")
+                    Info("Thème", "Sombre HORIZON")
+                    Info("Orientation", "Paysage (verrouillée)")
+                }
+                1 -> {
+                    OsSwitchRow("Notifications", appState.notificationsEnabled.value) {
+                        appState.setNotifications(it)
+                    }
+                    Text(
+                        "Les notifications de mises à jour et d'actualités du Store seront actives avec le Lot 3.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = HorizonOnSurfaceMuted
+                    )
+                }
+                2 -> {
+                    Text(
+                        "Connecte une manette Bluetooth dans les réglages Android, puis teste ses boutons ici.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = HorizonOnSurfaceMuted
+                    )
+                    OutlinedButton(onClick = onOpenController) { Text("Tester la manette") }
+                }
+                3 -> {
+                    Info(
+                        "Données",
+                        "Aucune donnée n'est envoyée en ligne dans cette version. Favoris, jeux récents et réglages restent sur cet appareil."
+                    )
+                    Info(
+                        "Jeux installés",
+                        "L'application vérifie seulement lesquels des jeux du HORIZON Store sont installés. " +
+                            "Les autres applications de ton téléphone ne sont ni lues, ni listées, ni conservées."
+                    )
+                    Info("Politique de confidentialité", "Elle sera publiée avant le lancement public.")
+                }
+                else -> {
+                    Info("Application", "HORIZON GAME")
+                    Info("Version", "0.2.1 (Lot 2)")
+                    Info("Identifiant", "com.horizon.game")
+                }
             }
-            SettingSwitch("Afficher toutes les applications (test)", appState.showAllApps.value) {
-                appState.setShowAllApps(it)
-            }
-            SettingInfo("Langue", "Français")
-            SettingInfo("Thème", "Sombre (HORIZON)")
-            SettingInfo("Confidentialité", "Aucune donnée collectée en Lot 1. Politique complète avant le lancement public.")
-            SettingInfo("Version", "0.2.0 (Lot 2)")
-            Text(
-                "Les préférences, favoris et jeux récents sont enregistrés sur cet appareil ; la synchronisation avec ton compte arrive au Lot 3. " +
-                    "L'option « toutes les applications » sert à tester le lancement quand aucun jeu n'est installé.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
 
 @Composable
-private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = onChange)
-    }
-}
-
-@Composable
-private fun SettingInfo(label: String, value: String) {
-    Column {
-        Text(label, style = MaterialTheme.typography.titleMedium)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun Info(label: String, value: String) {
+    Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Text(label, style = MaterialTheme.typography.titleMedium, color = HorizonOnSurface)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = HorizonOnSurfaceMuted)
     }
 }

@@ -3,105 +3,118 @@ package com.horizon.game.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.horizon.game.data.SampleCatalog
 import com.horizon.game.ui.AppState
 import com.horizon.game.ui.components.EmptyState
+import com.horizon.game.ui.components.GameCover
+import com.horizon.game.ui.components.OsPage
+import com.horizon.game.ui.components.StatusPill
+import com.horizon.game.ui.theme.HorizonBlue
+import com.horizon.game.ui.theme.HorizonOnSurface
+import com.horizon.game.ui.theme.HorizonOnSurfaceMuted
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Fiche d'un jeu du Store : visuel à gauche, informations et actions à droite. */
 @Composable
 fun GameDetailScreen(gameId: String, appState: AppState, onBack: () -> Unit) {
     val game = SampleCatalog.byId(gameId)
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text(game?.title ?: "Jeu introuvable") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        }
-    ) { padding ->
+    val context = LocalContext.current
+
+    OsPage(title = game?.title ?: "Jeu introuvable", onBack = onBack) {
         if (game == null) {
-            EmptyState("Jeu introuvable", "Cette fiche n'existe pas ou n'est plus disponible.", Modifier.padding(padding))
-            return@Scaffold
+            EmptyState("Jeu introuvable", "Cette fiche n'existe pas ou n'est plus disponible sur le Store.")
+            return@OsPage
         }
-        val context = LocalContext.current
+        val installed = appState.isInstalled(game)
         val favorite = appState.isFavorite(game.id)
-        // Règle §4.1 : « Jouer » seulement si l'application est détectée et lançable.
-        val playable = game.packageName?.let { pkg ->
-            appState.installed.any { it.packageName == pkg }
-        } == true
-        Column(
+
+        Row(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Text(game.description, style = MaterialTheme.typography.bodyLarge)
-            InfoRow("Éditeur", game.publisher)
-            InfoRow("Catégorie", game.category.label)
-            InfoRow("Classification", game.ageRating)
-            InfoRow("Taille indicative", "${game.sizeMb} Mo")
-            InfoRow("Compatibilité", game.compatibility.label)
+            GameCover(
+                title = game.title,
+                seed = game.id,
+                modifier = Modifier
+                    .width(170.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(20.dp))
+            )
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (installed) StatusPill("INSTALLÉ", HorizonBlue)
+                Text(
+                    game.title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = HorizonOnSurface
+                )
+                Text(
+                    "${game.category.label} · ${game.publisher} · ${game.ageRating} · ${game.sizeMb} Mo",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = HorizonOnSurfaceMuted
+                )
+                Text("Compatibilité : ${game.compatibility.label}", style = MaterialTheme.typography.bodyMedium, color = HorizonOnSurfaceMuted)
+                Text(game.description, style = MaterialTheme.typography.bodyLarge, color = HorizonOnSurface)
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { game.packageName?.let { appState.launchGame(context, it) } },
-                    enabled = playable
-                ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                    Text("Jouer")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (installed) {
+                        Button(onClick = { appState.launchGame(context, game) }) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Text("Jouer")
+                        }
+                    } else {
+                        // Le téléchargement depuis le Store arrive avec le backend (Lot 3).
+                        Button(onClick = {}, enabled = false) {
+                            Icon(Icons.Filled.Download, contentDescription = null)
+                            Text("Installer")
+                        }
+                    }
+                    OutlinedButton(onClick = { appState.toggleFavorite(game.id) }) {
+                        Icon(
+                            if (favorite) Icons.Filled.Star else Icons.Filled.StarBorder,
+                            contentDescription = null
+                        )
+                        Text(if (favorite) "Retirer des favoris" else "Ajouter aux favoris")
+                    }
                 }
-                OutlinedButton(onClick = { appState.toggleFavorite(game.id) }) {
-                    Icon(
-                        if (favorite) Icons.Filled.Star else Icons.Filled.StarBorder,
-                        contentDescription = null
+                if (!installed) {
+                    Text(
+                        "L'installation depuis le HORIZON Store sera disponible avec le backend (Lot 3).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = HorizonOnSurfaceMuted
                     )
-                    Text(if (favorite) "Retirer des favoris" else "Ajouter aux favoris")
                 }
             }
-            Text(
-                "Le bouton « Jouer » s'active quand le jeu est détecté comme installé sur cet appareil.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
-    }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("$label :", style = MaterialTheme.typography.titleMedium)
-        Text(value, style = MaterialTheme.typography.bodyLarge)
     }
 }

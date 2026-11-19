@@ -1,21 +1,29 @@
-# HORIZON GAME : Lot 2
+# HORIZON GAME : Lot 2 (version 0.2.1)
 
 Application Android (Kotlin + Jetpack Compose) du cahier des charges HORIZON GAME V1 (18 nov 2026).
 
-## Lot 2 (version 0.2.0)
-- **Splash animé** « lever d'horizon » : ligne d'horizon qui s'étire, halo bleu, logo qui se resserre, barre de progression
-- **Accueil de type console** : barre haute (heure, batterie, accès manette et paramètres), héros du jeu sélectionné, étagères Reprendre / Mes jeux / À découvrir / Prochainement, tuiles qui s'agrandissent au focus
-- **Mode paysage** : navigation latérale, accueil en deux colonnes (héros à gauche, étagères à droite), mode immersif (les barres système se révèlent d'un balayage)
-- **Détection des jeux Android installés** (catégorie « jeu » déclarée par Android) et bouton **Jouer** qui lance l'application
-- **Favoris et jeux récents** conservés sur l'appareil
-- Bibliothèque et catalogue en grille adaptative
-- Navigation à la manette : le D-pad déplace le focus entre les tuiles, OK ouvre ou lance
-- Réglage de test « Afficher toutes les applications » pour essayer le lancement sans jeu installé
+## Principes
+- **Paysage uniquement** (`sensorLandscape`), mode immersif.
+- **Les jeux viennent du HORIZON Store.** La bibliothèque ne contient que les jeux du Store installés sur l'appareil. L'application ne lit, ne liste et ne conserve aucune autre application.
+
+## Interface de type système
+- **Splash animé** « lever d'horizon »
+- **Barre d'état** : logo, section courante, heure, batterie, centre de contrôle
+- **Dock latéral** : Accueil, Store, Jeux, Profil, Réglages
+- **Centre de contrôle** (panneau à droite) : notifications, animations, raccourcis
+- **Accueil de console** : héros du jeu sélectionné à gauche, étagères de tuiles à droite
+- **Store** : bannière à la une, recherche, catégories, grille
+- **Bibliothèque** : jeux du Store installés + favoris
+- **Fiche jeu**, **Profil** (visiteur), **Réglages à deux volets**, **Manette** (test des boutons), **Aide**
+- Navigation à la manette : le D-pad déplace le focus (anneau bleu), OK valide
+
+## Pour tester « Installé » et « Jouer »
+Dans `app/src/main/java/com/horizon/game/data/SampleCatalog.kt`, remplace le `packageName` d'une entrée par celui d'une application réellement installée sur ton téléphone. Elle apparaîtra comme installée et le bouton Jouer la lancera.
 
 ## Pas encore fait
 | Lot | Contenu |
 | --- | --- |
-| 3 | Backend (HORIZON ID, catalogue API, synchronisation), Room |
+| 3 | Backend (HORIZON ID, catalogue API, publication des jeux, téléchargement et installation depuis le Store, synchronisation), Room |
 | 4 | Sécurité, tests, performance, accessibilité |
 
 ## Compiler l'APK avec GitHub Actions
