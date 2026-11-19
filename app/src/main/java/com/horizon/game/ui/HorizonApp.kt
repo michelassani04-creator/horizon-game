@@ -93,6 +93,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val CONTROLLER = "controller"
     const val HELP = "help"
+    const val AUTH = "auth"
     const val GAME = "game/{id}"
     fun game(id: String) = "game/$id"
 }
@@ -115,6 +116,7 @@ private fun sectionTitle(route: String?): String = when {
     route == Routes.SETTINGS -> "Réglages"
     route == Routes.CONTROLLER -> "Manette"
     route == Routes.HELP -> "Aide"
+    route == Routes.AUTH -> "HORIZON ID"
     route != null && route.startsWith("game/") -> "Fiche du jeu"
     else -> ""
 }
@@ -129,6 +131,7 @@ fun HorizonApp(resumeTick: Int) {
     val view = LocalView.current
     val navController = rememberNavController()
     val appState = remember { AppState(Prefs(context)) }
+    val auth: com.horizon.game.ui.auth.AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
@@ -203,18 +206,27 @@ fun HorizonApp(resumeTick: Int) {
                     }
                     composable(Routes.PROFILE) {
                         ProfileScreen(
+                            auth = auth,
+                            onOpenAuth = { navController.navigate(Routes.AUTH) },
                             onOpenController = { navController.navigate(Routes.CONTROLLER) },
                             onOpenHelp = { navController.navigate(Routes.HELP) }
                         )
                     }
                     composable(Routes.SETTINGS) {
-                        SettingsScreen(appState, onOpenController = { navController.navigate(Routes.CONTROLLER) })
+                        SettingsScreen(appState, auth, onOpenController = { navController.navigate(Routes.CONTROLLER) })
                     }
                     composable(Routes.GAME) { entry ->
                         GameDetailScreen(
                             gameId = entry.arguments?.getString("id").orEmpty(),
                             appState = appState,
                             onBack = { navController.popBackStack() }
+                        )
+                    }
+                    composable(Routes.AUTH) {
+                        com.horizon.game.ui.screens.AuthScreen(
+                            auth = auth,
+                            onDone = { navController.popBackStack() },
+                            onOpenServerSettings = { navController.navigateTopLevel(Routes.SETTINGS) }
                         )
                     }
                     composable(Routes.CONTROLLER) { ControllerScreen(onBack = { navController.popBackStack() }) }

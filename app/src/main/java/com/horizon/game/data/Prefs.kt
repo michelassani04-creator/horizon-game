@@ -21,6 +21,11 @@ class Prefs(context: Context) {
         sp.edit().putBoolean(key, value).apply()
     }
 
+    fun string(key: String, default: String): String = sp.getString(key, default) ?: default
+    fun saveString(key: String, value: String) {
+        sp.edit().putString(key, value).apply()
+    }
+
     private fun readList(key: String): List<String> =
         (sp.getString(key, "") ?: "").split("\n").filter { it.isNotBlank() }
 

@@ -13,6 +13,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import com.horizon.game.ui.auth.AuthViewModel
+import com.horizon.game.ui.theme.HorizonRed
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,12 +33,13 @@ import com.horizon.game.ui.theme.HorizonOnSurface
 import com.horizon.game.ui.theme.HorizonOnSurfaceMuted
 import com.horizon.game.ui.theme.HorizonSurface
 
-private val sections = listOf("Affichage", "Notifications", "Manette", "Confidentialité", "À propos")
+private val sections = listOf("Affichage", "Notifications", "Serveur", "Manette", "Confidentialité", "À propos")
 
 /** Réglages « système » : catégories à gauche, contenu de la catégorie à droite. */
 @Composable
 fun SettingsScreen(
     appState: AppState,
+    auth: AuthViewModel,
     onOpenController: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -97,6 +101,30 @@ fun SettingsScreen(
                     )
                 }
                 2 -> {
+                    var url by rememberSaveable { mutableStateOf(auth.serverUrl) }
+                    Text(
+                        "Adresse du serveur HORIZON (HTTPS). Elle est fournie par l'équipe HORIZON une fois le serveur en ligne.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = HorizonOnSurfaceMuted
+                    )
+                    OutlinedTextField(
+                        value = url,
+                        onValueChange = { url = it },
+                        label = { Text("https://api.exemple.com") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { auth.saveServerUrl(url) }) { Text("Enregistrer") }
+                        OutlinedButton(
+                            enabled = !auth.busy,
+                            onClick = { auth.saveServerUrl(url); auth.testServer() }
+                        ) { Text("Tester la connexion") }
+                    }
+                    auth.error?.let { Text(it, color = HorizonRed, style = MaterialTheme.typography.bodyMedium) }
+                    auth.info?.let { Text(it, color = HorizonBlue, style = MaterialTheme.typography.bodyMedium) }
+                }
+                3 -> {
                     Text(
                         "Connecte une manette Bluetooth dans les réglages Android, puis teste ses boutons ici.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -104,10 +132,10 @@ fun SettingsScreen(
                     )
                     OutlinedButton(onClick = onOpenController) { Text("Tester la manette") }
                 }
-                3 -> {
+                4 -> {
                     Info(
                         "Données",
-                        "Aucune donnée n'est envoyée en ligne dans cette version. Favoris, jeux récents et réglages restent sur cet appareil."
+                        "Sans compte, rien n'est envoyé en ligne : favoris, jeux récents et réglages restent sur cet appareil. Avec un HORIZON ID, ton pseudo, ton e-mail ou téléphone et tes préférences sont enregistrés sur le serveur HORIZON."
                     )
                     Info(
                         "Jeux installés",
@@ -118,7 +146,7 @@ fun SettingsScreen(
                 }
                 else -> {
                     Info("Application", "HORIZON GAME")
-                    Info("Version", "0.3.0 (Lot 3)")
+                    Info("Version", "0.3.1 (Lot 3)")
                     Info("Identifiant", "com.horizon.game")
                 }
             }

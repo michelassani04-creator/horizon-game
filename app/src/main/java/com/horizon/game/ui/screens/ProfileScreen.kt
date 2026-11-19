@@ -16,7 +16,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.horizon.game.ui.auth.AuthViewModel
+import com.horizon.game.ui.theme.HorizonRed
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,11 +42,12 @@ import com.horizon.game.ui.theme.HorizonOnSurfaceMuted
 import com.horizon.game.ui.theme.HorizonSurface
 
 /**
- * Profil. Mode visiteur uniquement pour l'instant : HORIZON ID (inscription, connexion,
- * récupération) arrive avec le backend au Lot 3 (F-003, F-004).
+ * Profil : mode visiteur, ou compte HORIZON ID connecté (vérification de l'e-mail, déconnexion).
  */
 @Composable
 fun ProfileScreen(
+    auth: AuthViewModel,
+    onOpenAuth: () -> Unit,
     onOpenController: () -> Unit,
     onOpenHelp: () -> Unit,
     modifier: Modifier = Modifier
@@ -64,14 +75,60 @@ fun ProfileScreen(
             ) {
                 Icon(Icons.Filled.Person, contentDescription = "Avatar", tint = HorizonBlue, modifier = Modifier.size(44.dp))
             }
-            Text("Visiteur", style = MaterialTheme.typography.titleLarge, color = HorizonOnSurface, modifier = Modifier.padding(top = 10.dp))
-            Text(
-                "Crée un HORIZON ID pour synchroniser ton profil, tes favoris et tes préférences (Lot 3).",
-                style = MaterialTheme.typography.bodyMedium,
-                color = HorizonOnSurfaceMuted,
-                modifier = Modifier.padding(vertical = 10.dp)
-            )
-            Button(onClick = {}, enabled = false) { Text("Se connecter (bientôt)") }
+            val user = auth.user
+            if (user == null) {
+                Text("Visiteur", style = MaterialTheme.typography.titleLarge, color = HorizonOnSurface, modifier = Modifier.padding(top = 10.dp))
+                Text(
+                    "Crée un HORIZON ID pour synchroniser ton profil, tes favoris et tes préférences.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = HorizonOnSurfaceMuted,
+                    modifier = Modifier.padding(vertical = 10.dp)
+                )
+                Button(onClick = onOpenAuth) { Text("Se connecter / S'inscrire") }
+            } else {
+                var showVerify by rememberSaveable { mutableStateOf(false) }
+                var code by rememberSaveable { mutableStateOf("") }
+                Text(user.displayName, style = MaterialTheme.typography.titleLarge, color = HorizonOnSurface, modifier = Modifier.padding(top = 10.dp))
+                user.email?.let {
+                    Text(
+                        if (user.emailVerified) "$it · vérifié" else "$it · non vérifié",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = HorizonOnSurfaceMuted
+                    )
+                }
+                user.phone?.let {
+                    Text("$it · vérification SMS bientôt", style = MaterialTheme.typography.bodyMedium, color = HorizonOnSurfaceMuted)
+                }
+                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (user.email != null && !user.emailVerified) {
+                        OutlinedButton(onClick = { auth.requestEmailCode(); showVerify = true }) { Text("Vérifier l'e-mail") }
+                    }
+                    OutlinedButton(onClick = { auth.logout() }) { Text("Se déconnecter") }
+                }
+                auth.error?.let { Text(it, color = HorizonRed, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp)) }
+                auth.info?.let { Text(it, color = HorizonBlue, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp)) }
+                if (showVerify) {
+                    AlertDialog(
+                        onDismissRequest = { showVerify = false },
+                        title = { Text("Code de vérification") },
+                        text = {
+                            OutlinedTextField(
+                                value = code,
+                                onValueChange = { code = it.filter(Char::isDigit).take(6) },
+                                label = { Text("Code à 6 chiffres") },
+                                singleLine = true
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                enabled = code.length == 6 && !auth.busy,
+                                onClick = { auth.confirmEmailCode(code) { showVerify = false; code = "" } }
+                            ) { Text("Valider") }
+                        },
+                        dismissButton = { TextButton(onClick = { showVerify = false }) { Text("Annuler") } }
+                    )
+                }
+            }
         }
         Column(
             Modifier
