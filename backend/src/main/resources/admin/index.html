@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>HORIZON Admin</title>
+<style>
+  :root { --bg:#0A0E17; --surface:#161F30; --border:#26354A; --blue:#1683FF; --red:#FF2E55; --text:#E8EEF8; --muted:#9AA8BF; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.4 system-ui, sans-serif; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); }
+  h1 { font-size:18px; margin:0; letter-spacing:.12em; }
+  h1 span { color:var(--blue); }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input, select, textarea { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font:inherit; }
+  textarea { min-height:90px; }
+  button { padding:10px 14px; border:0; border-radius:10px; background:var(--blue); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button.secondary { background:transparent; border:1px solid var(--border); color:var(--text); }
+  button.danger { background:var(--red); }
+  button:disabled { opacity:.5; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:560px) { .grid2 { grid-template-columns:1fr; } }
+  .game { display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; }
+  .game b { font-size:17px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .pill { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; background:var(--border); margin-left:6px; }
+  .pill.on { background:var(--blue); }
+  .pill.off { background:var(--red); }
+  .stats { display:flex; gap:10px; flex-wrap:wrap; }
+  .stat { flex:1; min-width:100px; text-align:center; }
+  .stat b { display:block; font-size:24px; color:var(--blue); }
+  #toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--surface); border:1px solid var(--border); padding:12px 16px; border-radius:12px; max-width:90%; display:none; }
+  #toast.err { border-color:var(--red); }
+  .hidden { display:none !important; }
+  .check { display:flex; gap:8px; align-items:center; margin:10px 0 0; color:var(--text); font-size:15px; }
+  .check input { width:auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>HORIZON <span>ADMIN</span></h1>
+  <button id="logout" class="secondary hidden">Déconnexion</button>
+</header>
+<main>
+  <section id="login" class="card">
+    <h2 style="margin-top:0">Connexion administrateur</h2>
+    <label for="token">Jeton administrateur (ADMIN_TOKEN)</label>
+    <input id="token" type="password" autocomplete="off" placeholder="Colle ton jeton ici">
+    <p class="muted">Le jeton reste dans cet onglet uniquement et n'est jamais enregistré ailleurs.</p>
+    <button id="loginBtn">Se connecter</button>
+  </section>
+
+  <section id="app" class="hidden">
+    <div class="card stats" id="stats"></div>
+    <div class="row" style="margin-bottom:12px">
+      <button id="newGame">+ Nouveau jeu</button>
+      <button id="reload" class="secondary">Actualiser</button>
+    </div>
+    <div id="list"></div>
+
+    <form id="form" class="card hidden">
+      <h2 id="formTitle" style="margin-top:0">Nouveau jeu</h2>
+      <div class="grid2">
+        <div><label for="f_id">Identifiant (minuscules, chiffres, tirets)</label><input id="f_id" required pattern="[a-z0-9][a-z0-9-]{1,59}"></div>
+        <div><label for="f_title">Titre</label><input id="f_title" required maxlength="80"></div>
+        <div><label for="f_publisher">Éditeur</label><input id="f_publisher" required maxlength="80"></div>
+        <div><label for="f_category">Catégorie</label>
+          <select id="f_category">
+            <option value="ACTION">Action</option><option value="RACING">Course</option>
+            <option value="PUZZLE">Réflexion</option><option value="ADVENTURE">Aventure</option>
+            <option value="STRATEGY">Stratégie</option>
+          </select></div>
+        <div><label for="f_age">Âge conseillé (ex. 7+, 12+)</label><input id="f_age" value="12+"></div>
+        <div><label for="f_compat">Compatibilité</label>
+          <select id="f_compat">
+            <option value="DECLARED">Déclarée par l'éditeur</option>
+            <option value="VERIFIED">Vérifiée</option>
+            <option value="UNKNOWN">Inconnue</option>
+          </select></div>
+        <div><label for="f_size">Taille (Mo)</label><input id="f_size" type="number" min="0" value="0"></div>
+        <div><label for="f_pkg">Nom de paquet Android</label><input id="f_pkg" placeholder="com.monstudio.monjeu"></div>
+      </div>
+      <label for="f_desc">Description</label><textarea id="f_desc" maxlength="4000"></textarea>
+      <label for="f_url">Adresse de l'APK (https://…)</label><input id="f_url" type="url" placeholder="https://github.com/…/releases/download/…/jeu.apk">
+      <label for="f_sha">Empreinte SHA-256 de l'APK</label><input id="f_sha" placeholder="64 caractères hexadécimaux">
+      <label for="f_file">Calculer à partir d'un fichier APK de ce téléphone (taille + empreinte)</label>
+      <input id="f_file" type="file" accept=".apk,application/vnd.android.package-archive">
+      <div class="muted" id="fileInfo"></div>
+      <label class="check"><input id="f_featured" type="checkbox"> Mis à la une</label>
+      <label class="check"><input id="f_published" type="checkbox" checked> Publié (visible dans le Store)</label>
+      <div class="row" style="margin-top:14px">
+        <button type="submit" id="saveBtn">Enregistrer</button>
+        <button type="button" id="cancel" class="secondary">Annuler</button>
+      </div>
+    </form>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+(function () {
+  var token = "";
+  try { token = sessionStorage.getItem("hz_admin") || ""; } catch (e) {}
+  var $ = function (id) { return document.getElementById(id); };
+  var editing = null;
+
+  function toast(msg, isErr) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.className = isErr ? "err" : "";
+    t.style.display = "block";
+    clearTimeout(toast.h);
+    toast.h = setTimeout(function () { t.style.display = "none"; }, 4000);
+  }
+
+  function api(method, path, body) {
+    var opts = { method: method, headers: { "X-Admin-Token": token } };
+    if (body) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+    return fetch(path, opts).then(function (r) {
+      if (r.status === 204) return null;
+      return r.text().then(function (txt) {
+        var data = null;
+        try { data = txt ? JSON.parse(txt) : null; } catch (e) {}
+        if (!r.ok) { var err = new Error((data && data.message) || ("Erreur " + r.status)); err.status = r.status; throw err; }
+        return data;
+      });
+    });
+  }
+
+  function show(loggedIn) {
+    $("login").classList.toggle("hidden", loggedIn);
+    $("app").classList.toggle("hidden", !loggedIn);
+    $("logout").classList.toggle("hidden", !loggedIn);
+  }
+
+  function pill(text, cls) {
+    var s = document.createElement("span");
+    s.className = "pill " + (cls || "");
+    s.textContent = text;
+    return s;
+  }
+
+  function renderStats(s) {
+    var box = $("stats");
+    box.textContent = "";
+    [["Joueurs", s.users], ["Jeux", s.games], ["Sessions actives", s.activeSessions]].forEach(function (p) {
+      var d = document.createElement("div"); d.className = "stat";
+      var b = document.createElement("b"); b.textContent = String(p[1]);
+      var l = document.createElement("span"); l.className = "muted"; l.textContent = p[0];
+      d.appendChild(b); d.appendChild(l); box.appendChild(d);
+    });
+  }
+
+  function renderList(items) {
+    var list = $("list");
+    list.textContent = "";
+    if (!items.length) {
+      var e = document.createElement("div"); e.className = "card muted";
+      e.textContent = "Aucun jeu pour le moment. Touche « + Nouveau jeu » pour publier le premier.";
+      list.appendChild(e); return;
+    }
+    items.forEach(function (g) {
+      var c = document.createElement("div"); c.className = "card game";
+      var left = document.createElement("div");
+      var b = document.createElement("b"); b.textContent = g.title;
+      left.appendChild(b);
+      left.appendChild(pill(g.published ? "publié" : "masqué", g.published ? "on" : "off"));
+      if (g.featured) left.appendChild(pill("à la une", "on"));
+      var m = document.createElement("div"); m.className = "muted";
+      m.textContent = g.id + " · " + g.category + " · " + g.sizeMb + " Mo" + (g.apkUrl ? " · APK ok" : " · sans APK");
+      left.appendChild(m);
+      var right = document.createElement("div"); right.className = "row";
+      var edit = document.createElement("button"); edit.className = "secondary"; edit.textContent = "Modifier";
+      edit.onclick = function () { openForm(g); };
+      var del = document.createElement("button"); del.className = "danger"; del.textContent = "Supprimer";
+      del.onclick = function () {
+        if (!confirm("Supprimer définitivement « " + g.title + " » ?")) return;
+        api("DELETE", "/v1/admin/games/" + encodeURIComponent(g.id)).then(function () { toast("Jeu supprimé."); load(); })
+          .catch(function (er) { toast(er.message, true); });
+      };
+      right.appendChild(edit); right.appendChild(del);
+      c.appendChild(left); c.appendChild(right); list.appendChild(c);
+    });
+  }
+
+  function load() {
+    return Promise.all([api("GET", "/v1/admin/games"), api("GET", "/v1/admin/stats")]).then(function (res) {
+      renderList(res[0].items); renderStats(res[1]); show(true);
+    }).catch(function (er) {
+      if (er.status === 401 || er.status === 404) { show(false); try { sessionStorage.removeItem("hz_admin"); } catch (e) {} }
+      toast(er.message, true);
+    });
+  }
+
+  function openForm(g) {
+    editing = g ? g.id : null;
+    $("formTitle").textContent = g ? "Modifier « " + g.title + " »" : "Nouveau jeu";
+    var v = g || { id: "", title: "", publisher: "", category: "ACTION", description: "", ageRating: "12+", sizeMb: 0, compatibility: "DECLARED", packageName: "", apkUrl: "", apkSha256: "", featured: false, published: true };
+    $("f_id").value = v.id; $("f_id").readOnly = !!g;
+    $("f_title").value = v.title; $("f_publisher").value = v.publisher; $("f_category").value = v.category;
+    $("f_age").value = v.ageRating; $("f_compat").value = v.compatibility; $("f_size").value = v.sizeMb;
+    $("f_pkg").value = v.packageName || ""; $("f_desc").value = v.description;
+    $("f_url").value = v.apkUrl || ""; $("f_sha").value = v.apkSha256 || "";
+    $("f_featured").checked = !!v.featured; $("f_published").checked = v.published !== false;
+    $("fileInfo").textContent = "";
+    $("form").classList.remove("hidden");
+    $("form").scrollIntoView({ behavior: "smooth" });
+  }
+
+  $("loginBtn").onclick = function () {
+    token = $("token").value.trim();
+    if (!token) return;
+    try { sessionStorage.setItem("hz_admin", token); } catch (e) {}
+    $("token").value = "";
+    load();
+  };
+  $("logout").onclick = function () { token = ""; try { sessionStorage.removeItem("hz_admin"); } catch (e) {} show(false); };
+  $("newGame").onclick = function () { openForm(null); };
+  $("reload").onclick = load;
+  $("cancel").onclick = function () { $("form").classList.add("hidden"); };
+
+  $("f_file").onchange = function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    $("f_size").value = Math.max(1, Math.ceil(f.size / 1048576));
+    $("fileInfo").textContent = "Calcul de l'empreinte en cours… (un gros fichier peut prendre un moment)";
+    f.arrayBuffer().then(function (buf) { return crypto.subtle.digest("SHA-256", buf); }).then(function (h) {
+      var hex = Array.prototype.map.call(new Uint8Array(h), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+      $("f_sha").value = hex;
+      $("fileInfo").textContent = "Taille et empreinte remplies à partir de « " + f.name + " ».";
+    }).catch(function () { $("fileInfo").textContent = "Impossible de calculer l'empreinte ici (fichier trop gros). Colle-la à la main."; });
+  };
+
+  $("form").onsubmit = function (ev) {
+    ev.preventDefault();
+    var id = $("f_id").value.trim();
+    var body = {
+      id: id, title: $("f_title").value.trim(), publisher: $("f_publisher").value.trim(),
+      category: $("f_category").value, description: $("f_desc").value,
+      ageRating: $("f_age").value.trim() || "12+", sizeMb: parseInt($("f_size").value, 10) || 0,
+      compatibility: $("f_compat").value,
+      packageName: $("f_pkg").value.trim() || null, apkUrl: $("f_url").value.trim() || null,
+      apkSha256: $("f_sha").value.trim() || null,
+      featured: $("f_featured").checked, published: $("f_published").checked
+    };
+    $("saveBtn").disabled = true;
+    api("PUT", "/v1/admin/games/" + encodeURIComponent(id), body).then(function () {
+      toast(editing ? "Jeu mis à jour." : "Jeu publié.");
+      $("form").classList.add("hidden"); load();
+    }).catch(function (er) { toast(er.message, true); }).then(function () { $("saveBtn").disabled = false; });
+  };
+
+  if (token) load(); else show(false);
+})();
+</script>
+</body>
+</html>

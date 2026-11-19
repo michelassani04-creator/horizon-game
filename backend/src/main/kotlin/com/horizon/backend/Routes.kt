@@ -1,11 +1,13 @@
 package com.horizon.backend
 
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -65,6 +67,16 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
 
     routing {
         get("/health") { call.respond(mapOf("status" to "ok")) }
+
+        // Page d'administration (publique : elle ne contient aucun secret, l'API exige le jeton).
+        get("/admin") {
+            call.response.headers.append(
+                "Content-Security-Policy",
+                "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'"
+            )
+            call.response.headers.append("X-Content-Type-Options", "nosniff")
+            call.respondText(adminPageHtml, ContentType.Text.Html)
+        }
 
         route("/v1") {
             get("/config") {
@@ -260,25 +272,39 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
             }
 
             // ---------- Publication de jeux (administrateur) ----------
-            adminRoutes(config, store)
+            adminRoutes(config, store, limiter)
         }
     }
 }
 
-private fun Route.adminRoutes(config: AppConfig, store: Store) {
+private val adminPageHtml: String by lazy {
+    object {}.javaClass.getResourceAsStream("/admin/index.html")?.bufferedReader()?.readText()
+        ?: "<h1>Page d'administration introuvable</h1>"
+}
+
+private fun Route.adminRoutes(config: AppConfig, store: Store, limiter: RateLimiter) {
     fun ApplicationCall.requireAdmin() {
         val expected = config.adminToken
             ?: throw ApiException(HttpStatusCode.NotFound, "not_found", "Introuvable.")
+        val ip = clientIp(config.trustProxy)
+        // Après 10 échecs en 15 minutes, même le bon jeton est refusé (anti-devinette).
+        if (limiter.count("admin-fail:$ip", 900_000) >= 10) throw tooMany()
         val given = request.headers["X-Admin-Token"] ?: ""
         if (!Security.constantTimeEquals(expected, given)) {
+            limiter.allow("admin-fail:$ip", Int.MAX_VALUE, 900_000)
             throw ApiException(HttpStatusCode.Unauthorized, "unauthorized", "Jeton administrateur invalide.")
         }
+    }
+
+    get("/admin/stats") {
+        call.requireAdmin()
+        call.respond(io { store.stats() })
     }
 
     route("/admin/games") {
         get {
             call.requireAdmin()
-            call.respond(io { store.listGames(null, null, 1, 100) })
+            call.respond(io { store.listAllGames() })
         }
         put("/{id}") {
             call.requireAdmin()

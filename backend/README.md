@@ -15,7 +15,8 @@ API HORIZON ID + HORIZON Store. Kotlin · Ktor · PostgreSQL · Docker.
 | `POST /v1/me/verify/request` · `/confirm` | Vérification e-mail par code à 6 chiffres |
 | `GET/PUT /v1/me/favorites` · `PUT/DELETE /v1/me/favorites/{gameId}` | Favoris synchronisés |
 | `GET /v1/games` (`query`, `category`, `page`, `pageSize`) · `GET /v1/games/{id}` | Catalogue du Store |
-| `GET /v1/admin/games` · `PUT/DELETE /v1/admin/games/{id}` | Publication de jeux (en-tête `X-Admin-Token`) |
+| `GET /admin` | **Page d'administration** (publier, modifier, supprimer des jeux depuis le téléphone ; demande le `ADMIN_TOKEN`) |
+| `GET /v1/admin/games` · `PUT/DELETE /v1/admin/games/{id}` · `GET /v1/admin/stats` | API d'administration (en-tête `X-Admin-Token`) |
 
 Authentification : en-tête `Authorization: Bearer <jeton>`. Les jetons sont opaques, révocables, et seul leur hachage est stocké. Mots de passe : PBKDF2-SHA256 (120 000 itérations). Limitation de débit sur l'inscription, la connexion et les codes.
 

@@ -101,6 +101,9 @@ data class GameDto(
 data class GameListResponse(val items: List<GameDto>, val total: Int, val page: Int, val pageSize: Int)
 
 @Serializable
+data class AdminStats(val users: Int, val games: Int, val activeSessions: Int)
+
+@Serializable
 data class FavoritesResponse(val gameIds: List<String>)
 
 @Serializable

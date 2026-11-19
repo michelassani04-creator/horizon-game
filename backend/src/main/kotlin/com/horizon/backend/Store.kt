@@ -259,6 +259,27 @@ class Store(private val ds: DataSource) {
         }
     }
 
+    /** Tous les jeux, publiés ou non (administration). */
+    fun listAllGames(): GameListResponse = withConn { c ->
+        val items = c.prepareStatement("SELECT $GAME_COLS FROM games ORDER BY featured DESC, title ASC").use { ps ->
+            ps.executeQuery().use { rs ->
+                val list = ArrayList<GameDto>()
+                while (rs.next()) list += rs.toGame()
+                list
+            }
+        }
+        GameListResponse(items, items.size, 1, items.size)
+    }
+
+    fun stats(): AdminStats = withConn { c ->
+        fun count(sql: String): Int = c.createStatement().use { st -> st.executeQuery(sql).use { rs -> rs.next(); rs.getInt(1) } }
+        AdminStats(
+            users = count("SELECT count(*) FROM users"),
+            games = count("SELECT count(*) FROM games"),
+            activeSessions = count("SELECT count(*) FROM device_sessions WHERE revoked = FALSE AND expires_at > now()")
+        )
+    }
+
     fun countGames(): Int = withConn { c ->
         c.createStatement().use { st -> st.executeQuery("SELECT count(*) FROM games").use { rs -> rs.next(); rs.getInt(1) } }
     }

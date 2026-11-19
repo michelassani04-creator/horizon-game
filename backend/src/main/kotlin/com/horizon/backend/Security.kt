@@ -54,6 +54,15 @@ object Security {
 class RateLimiter {
     private val hits = HashMap<String, ArrayDeque<Long>>()
 
+    /** Nombre d'événements enregistrés dans la fenêtre, sans en ajouter. */
+    @Synchronized
+    fun count(key: String, windowMs: Long): Int {
+        val now = System.currentTimeMillis()
+        val queue = hits[key] ?: return 0
+        while (queue.isNotEmpty() && now - queue.first() > windowMs) queue.removeFirst()
+        return queue.size
+    }
+
     @Synchronized
     fun allow(key: String, max: Int, windowMs: Long): Boolean {
         val now = System.currentTimeMillis()
