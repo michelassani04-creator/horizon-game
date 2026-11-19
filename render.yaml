@@ -1,0 +1,22 @@
+# Déploiement Render (offre gratuite) : le service Docker du dossier backend/.
+# La base PostgreSQL est externe (Neon) : DATABASE_URL est à coller dans le tableau de bord Render.
+services:
+  - type: web
+    name: horizon-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: SEED_DEMO
+        value: "false"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: LOG_CODES
+        value: "true"

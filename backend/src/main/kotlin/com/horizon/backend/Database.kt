@@ -14,8 +14,12 @@ object Database {
             jdbcUrl = config.dbUrl
             username = config.dbUser
             password = config.dbPassword
-            maximumPoolSize = 10
-            connectionTimeout = 10_000
+            maximumPoolSize = 5
+            minimumIdle = 0
+            // Les bases gratuites se mettent en veille : on renouvelle les connexions avant leur coupure.
+            idleTimeout = 60_000
+            maxLifetime = 240_000
+            connectionTimeout = 20_000
         }
         for (attempt in 1..30) {
             try {

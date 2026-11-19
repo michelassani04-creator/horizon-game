@@ -16,11 +16,18 @@ data class AppConfig(
     val logVerificationCodes: Boolean
 ) {
     companion object {
-        fun fromEnv(env: Map<String, String> = System.getenv()): AppConfig = AppConfig(
+        fun fromEnv(env: Map<String, String> = System.getenv()): AppConfig {
+            // DATABASE_URL (format postgresql://utilisateur:motdepasse@hote/base, fourni par Neon, Render, etc.)
+            // est converti en adresse JDBC, sauf si DB_URL est défini explicitement.
+            val fromUrl = if (env["DB_URL"] == null) env["DATABASE_URL"]?.let { jdbcFromDatabaseUrl(it) } else null
+            return build(env, fromUrl)
+        }
+
+        private fun build(env: Map<String, String>, fromUrl: Triple<String, String, String>?): AppConfig = AppConfig(
             port = env["PORT"]?.toIntOrNull() ?: 8080,
-            dbUrl = env["DB_URL"] ?: "jdbc:postgresql://localhost:5432/horizon",
-            dbUser = env["DB_USER"] ?: "horizon",
-            dbPassword = env["DB_PASSWORD"] ?: "",
+            dbUrl = env["DB_URL"] ?: fromUrl?.first ?: "jdbc:postgresql://localhost:5432/horizon",
+            dbUser = env["DB_USER"] ?: fromUrl?.second ?: "horizon",
+            dbPassword = env["DB_PASSWORD"] ?: fromUrl?.third ?: "",
             adminToken = env["ADMIN_TOKEN"]?.takeIf { it.length >= 24 },
             sessionDays = env["SESSION_DAYS"]?.toLongOrNull()?.coerceIn(1, 365) ?: 30,
             seedDemo = env["SEED_DEMO"]?.lowercase() == "true",
@@ -28,4 +35,29 @@ data class AppConfig(
             logVerificationCodes = env["LOG_CODES"]?.lowercase() != "false"
         )
     }
+}
+
+/**
+ * Convertit postgresql://user:pass@hote:port/base?options en (adresse JDBC, utilisateur, mot de passe).
+ * Ajoute sslmode=require (bases en ligne) et prepareThreshold=0 (compatible avec les pools de connexions),
+ * et retire channel_binding, inconnu du pilote JDBC.
+ */
+fun jdbcFromDatabaseUrl(raw: String): Triple<String, String, String>? {
+    val uri = try {
+        java.net.URI(raw.trim())
+    } catch (e: Exception) {
+        return null
+    }
+    if (uri.scheme != "postgres" && uri.scheme != "postgresql") return null
+    val host = uri.host ?: return null
+    val port = if (uri.port == -1) 5432 else uri.port
+    val info = uri.rawUserInfo ?: return null
+    val user = java.net.URLDecoder.decode(info.substringBefore(':'), "UTF-8")
+    val pass = java.net.URLDecoder.decode(info.substringAfter(':', ""), "UTF-8")
+    val params = (uri.rawQuery ?: "").split('&')
+        .filter { it.isNotBlank() && !it.startsWith("channel_binding") }
+        .toMutableList()
+    if (params.none { it.startsWith("sslmode") }) params += "sslmode=require"
+    if (params.none { it.startsWith("prepareThreshold") }) params += "prepareThreshold=0"
+    return Triple("jdbc:postgresql://$host:$port${uri.rawPath}?${params.joinToString("&")}", user, pass)
 }

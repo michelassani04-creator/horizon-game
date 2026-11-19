@@ -12,4 +12,4 @@ WORKDIR /app
 COPY --from=build /src/build/libs/horizon-backend.jar /app/horizon-backend.jar
 USER horizon
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/horizon-backend.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-XX:+UseSerialGC", "-Xss512k", "-jar", "/app/horizon-backend.jar"]
