@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: horizon
+      POSTGRES_USER: horizon
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Définissez DB_PASSWORD dans .env}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U horizon -d horizon"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      DB_URL: jdbc:postgresql://db:5432/horizon
+      DB_USER: horizon
+      DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      SEED_DEMO: ${SEED_DEMO:-false}
+      SESSION_DAYS: ${SESSION_DAYS:-30}
+      LOG_CODES: ${LOG_CODES:-true}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+    # Sans HTTPS (tests) : accessible sur le port 8080.
+    # Avec le profil "https", seul Caddy est exposé : mettez alors "127.0.0.1:8080:8080".
+    ports:
+      - "${API_BIND:-8080}:8080"
+
+  # Optionnel : HTTPS automatique (Let's Encrypt). Lancer avec : docker compose --profile https up -d
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+
+volumes:
+  dbdata:
+  caddydata:
+  caddyconfig:
