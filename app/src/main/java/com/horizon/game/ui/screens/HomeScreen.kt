@@ -112,7 +112,8 @@ fun HomeScreen(
     val selected = allTiles.firstOrNull { it.key == selectedKey } ?: allTiles.first()
 
     val accent = tileColors(selected.key)
-    val bg by animateColorAsState(accent.first, tween(if (reduce) 0 else 500), label = "homeBg")
+    androidx.compose.runtime.LaunchedEffect(selected.key) { appState.accent.value = accent.first }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { appState.accent.value = null } }
 
     fun activate(tile: Tile) {
         when (tile.kind) {
@@ -161,7 +162,6 @@ fun HomeScreen(
     Box(
         modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(bg.copy(alpha = 0.70f), HorizonBackground, HorizonBackground)))
     ) {
         Row(Modifier.fillMaxSize()) {
             // Héros

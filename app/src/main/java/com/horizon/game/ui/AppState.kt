@@ -33,6 +33,9 @@ class AppState(private val prefs: Prefs) {
     val notificationsEnabled = mutableStateOf(prefs.bool("notifications", true))
     val reduceAnimations = mutableStateOf(prefs.bool("reduce_animations", false))
 
+    /** Couleur d'ambiance du fond animé (jeu sélectionné sur l'accueil), null = bleu HORIZON. */
+    val accent = mutableStateOf<androidx.compose.ui.graphics.Color?>(null)
+
     fun isInstalled(game: Game): Boolean =
         game.packageName?.let { it in installedPackages } == true
 

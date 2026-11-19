@@ -152,6 +152,10 @@ fun HorizonApp(resumeTick: Int) {
     BackHandler(enabled = panelOpen) { panelOpen = false }
 
     Box(Modifier.fillMaxSize().background(HorizonBackground)) {
+        com.horizon.game.ui.components.HorizonBackdrop(
+            accent = appState.accent.value,
+            reduce = appState.reduceAnimations.value
+        )
         Column(
             Modifier
                 .fillMaxSize()
