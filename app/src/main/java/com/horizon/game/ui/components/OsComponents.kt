@@ -199,7 +199,7 @@ fun OsPage(
 
 /** Ligne de réglage avec interrupteur, entièrement focalisable. */
 @Composable
-fun OsSwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+fun OsSwitchRow(label: String, checked: Boolean, modifier: Modifier = Modifier, onChange: (Boolean) -> Unit) {
     Row(
         modifier
             .fillMaxWidth()
