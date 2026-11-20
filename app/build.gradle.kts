@@ -16,8 +16,8 @@ android {
         applicationId = "com.horizon.game"
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "0.3.3"
+        versionCode = 9
+        versionName = "0.5.0"
         buildConfigField("String", "API_URL", "\"$horizonApiUrl\"")
     }
 

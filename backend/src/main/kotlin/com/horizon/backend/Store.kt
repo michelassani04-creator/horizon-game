@@ -19,7 +19,8 @@ class Store(private val ds: DataSource) {
         private const val USER_COLS =
             "id,email,email_verified,phone,phone_verified,display_name,avatar_url,password_hash,status,language,theme,notifications,created_at"
         private const val GAME_COLS =
-            "id,title,publisher,category,description,age_rating,size_mb,compatibility,package_name,apk_url,apk_sha256,featured,published"
+            "id,title,publisher,category,description,age_rating,size_mb,compatibility,package_name,apk_url,apk_sha256,featured,published," +
+                "pack_url,pack_sha256,version_code,version_name,engine,engine_version,price_cents,currency"
 
         fun isUniqueViolation(e: SQLException) = e.sqlState == "23505"
     }
@@ -53,7 +54,15 @@ class Store(private val ds: DataSource) {
         apkUrl = getString("apk_url"),
         apkSha256 = getString("apk_sha256"),
         featured = getBoolean("featured"),
-        published = getBoolean("published")
+        published = getBoolean("published"),
+        packUrl = getString("pack_url"),
+        packSha256 = getString("pack_sha256"),
+        versionCode = getInt("version_code"),
+        versionName = getString("version_name"),
+        engine = getString("engine"),
+        engineVersion = getString("engine_version"),
+        priceCents = getInt("price_cents").let { if (wasNull()) null else it },
+        currency = getString("currency")
     )
 
     // ---------- Utilisateurs ----------
@@ -287,13 +296,17 @@ class Store(private val ds: DataSource) {
     fun upsertGame(g: GameDto) = withConn { c ->
         c.prepareStatement(
             """
-            INSERT INTO games (id,title,publisher,category,description,age_rating,size_mb,compatibility,package_name,apk_url,apk_sha256,featured,published)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO games (id,title,publisher,category,description,age_rating,size_mb,compatibility,package_name,apk_url,apk_sha256,featured,published,
+                               pack_url,pack_sha256,version_code,version_name,engine,engine_version,price_cents,currency)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT (id) DO UPDATE SET
               title=EXCLUDED.title, publisher=EXCLUDED.publisher, category=EXCLUDED.category,
               description=EXCLUDED.description, age_rating=EXCLUDED.age_rating, size_mb=EXCLUDED.size_mb,
               compatibility=EXCLUDED.compatibility, package_name=EXCLUDED.package_name, apk_url=EXCLUDED.apk_url,
               apk_sha256=EXCLUDED.apk_sha256, featured=EXCLUDED.featured, published=EXCLUDED.published,
+              pack_url=EXCLUDED.pack_url, pack_sha256=EXCLUDED.pack_sha256, version_code=EXCLUDED.version_code,
+              version_name=EXCLUDED.version_name, engine=EXCLUDED.engine, engine_version=EXCLUDED.engine_version,
+              price_cents=EXCLUDED.price_cents, currency=EXCLUDED.currency,
               updated_at=now()
             """.trimIndent()
         ).use { ps ->
@@ -310,6 +323,14 @@ class Store(private val ds: DataSource) {
             ps.setString(11, g.apkSha256)
             ps.setBoolean(12, g.featured)
             ps.setBoolean(13, g.published)
+            ps.setString(14, g.packUrl)
+            ps.setString(15, g.packSha256)
+            ps.setInt(16, g.versionCode)
+            ps.setString(17, g.versionName)
+            ps.setString(18, g.engine)
+            ps.setString(19, g.engineVersion)
+            if (g.priceCents == null) ps.setNull(20, java.sql.Types.INTEGER) else ps.setInt(20, g.priceCents)
+            ps.setString(21, g.currency)
             ps.executeUpdate()
         }
     }
@@ -378,6 +399,256 @@ class Store(private val ds: DataSource) {
             ps.setObject(1, userId)
             ps.setString(2, gameId)
             ps.executeUpdate()
+        }
+    }
+
+    // ---------- Codes de téléchargement et bibliothèque ----------
+
+    fun createCodes(gameId: String, codeHashes: List<String>, expiresAt: Instant?) = withConn { c ->
+        c.autoCommit = false
+        try {
+            c.prepareStatement("INSERT INTO redeem_codes (id,code_hash,game_id,expires_at) VALUES (?,?,?,?)").use { ps ->
+                for (h in codeHashes) {
+                    ps.setObject(1, UUID.randomUUID())
+                    ps.setString(2, h)
+                    ps.setString(3, gameId)
+                    ps.setTimestamp(4, expiresAt?.let { Timestamp.from(it) })
+                    ps.addBatch()
+                }
+                ps.executeBatch()
+            }
+            c.commit()
+        } catch (e: Exception) {
+            c.rollback()
+            throw e
+        } finally {
+            c.autoCommit = true
+        }
+    }
+
+    fun codeStats(gameId: String): CodeStats = withConn { c ->
+        c.prepareStatement("SELECT count(*), count(redeemed_by) FROM redeem_codes WHERE game_id = ?").use { ps ->
+            ps.setString(1, gameId)
+            ps.executeQuery().use { rs -> rs.next(); CodeStats(rs.getInt(1), rs.getInt(2)) }
+        }
+    }
+
+    /**
+     * Utilise un code : ajoute le jeu à la bibliothèque du joueur. Renvoie null si le code est invalide,
+     * expiré ou déjà utilisé. Lève 409 si le joueur possède déjà ce jeu (le code n'est alors pas consommé).
+     */
+    fun redeemCode(userId: UUID, codeHash: String): GameDto? {
+        val gameId: String = withConn { c ->
+            c.autoCommit = false
+            try {
+                val row = c.prepareStatement(
+                    "SELECT id, game_id FROM redeem_codes WHERE code_hash = ? AND redeemed_by IS NULL " +
+                        "AND (expires_at IS NULL OR expires_at > now()) FOR UPDATE"
+                ).use { ps ->
+                    ps.setString(1, codeHash)
+                    ps.executeQuery().use { rs ->
+                        if (rs.next()) rs.getObject("id", UUID::class.java) to rs.getString("game_id") else null
+                    }
+                }
+                if (row == null) {
+                    c.rollback()
+                    return@withConn ""
+                }
+                val owned = c.prepareStatement("SELECT 1 FROM user_games WHERE user_id = ? AND game_id = ?").use { ps ->
+                    ps.setObject(1, userId)
+                    ps.setString(2, row.second)
+                    ps.executeQuery().use { it.next() }
+                }
+                if (owned) {
+                    c.rollback()
+                    throw ApiException(io.ktor.http.HttpStatusCode.Conflict, "already_owned", "Tu possèdes déjà ce jeu.")
+                }
+                c.prepareStatement("UPDATE redeem_codes SET redeemed_by = ?, redeemed_at = now() WHERE id = ?").use { ps ->
+                    ps.setObject(1, userId)
+                    ps.setObject(2, row.first)
+                    ps.executeUpdate()
+                }
+                c.prepareStatement("INSERT INTO user_games (user_id, game_id, source) VALUES (?, ?, 'code') ON CONFLICT DO NOTHING").use { ps ->
+                    ps.setObject(1, userId)
+                    ps.setString(2, row.second)
+                    ps.executeUpdate()
+                }
+                c.commit()
+                row.second
+            } catch (e: ApiException) {
+                throw e
+            } catch (e: Exception) {
+                c.rollback()
+                throw e
+            } finally {
+                c.autoCommit = true
+            }
+        }
+        if (gameId.isEmpty()) return null
+        return getGame(gameId, includeUnpublished = true)
+    }
+
+    fun ownedGames(userId: UUID): List<GameDto> = withConn { c ->
+        c.prepareStatement(
+            "SELECT $GAME_COLS FROM games WHERE published = TRUE AND id IN (SELECT game_id FROM user_games WHERE user_id = ?) ORDER BY title"
+        ).use { ps ->
+            ps.setObject(1, userId)
+            ps.executeQuery().use { rs ->
+                val list = ArrayList<GameDto>()
+                while (rs.next()) list += rs.toGame()
+                list
+            }
+        }
+    }
+
+    // ---------- Commandes et paiements ----------
+
+    private fun ResultSet.toOrder() = OrderDto(
+        id = getObject("id", UUID::class.java).toString(),
+        gameId = getString("game_id"),
+        gameTitle = getString("game_title"),
+        amountCents = getInt("amount_cents"),
+        currency = getString("currency"),
+        provider = getString("provider"),
+        status = getString("status"),
+        createdAt = getTimestamp("created_at").toInstant().toString(),
+        paidAt = getTimestamp("paid_at")?.toInstant()?.toString(),
+        sandbox = getString("provider") == "sandbox"
+    )
+
+    private val orderCols = "id,game_id,game_title,amount_cents,currency,provider,status,created_at,paid_at"
+
+    fun ownsGame(userId: UUID, gameId: String): Boolean = withConn { c ->
+        c.prepareStatement("SELECT 1 FROM user_games WHERE user_id = ? AND game_id = ?").use { ps ->
+            ps.setObject(1, userId)
+            ps.setString(2, gameId)
+            ps.executeQuery().use { it.next() }
+        }
+    }
+
+    /** Ajoute un jeu à la bibliothèque (jeu gratuit, achat confirmé…). */
+    fun grantGame(userId: UUID, gameId: String, source: String) = withConn { c ->
+        c.prepareStatement(
+            "INSERT INTO user_games (user_id, game_id, source) SELECT ?, id, ? FROM games WHERE id = ? ON CONFLICT DO NOTHING"
+        ).use { ps ->
+            ps.setObject(1, userId)
+            ps.setString(2, source)
+            ps.setString(3, gameId)
+            ps.executeUpdate()
+        }
+    }
+
+    /** Crée une commande en attente, ou renvoie celle déjà en attente pour ce joueur, ce jeu et ce fournisseur. */
+    fun createOrder(userId: UUID, game: GameDto, provider: String): OrderDto = withConn { c ->
+        val existing = c.prepareStatement(
+            "SELECT $orderCols FROM orders WHERE user_id = ? AND game_id = ? AND provider = ? AND status = 'pending' " +
+                "ORDER BY created_at DESC LIMIT 1"
+        ).use { ps ->
+            ps.setObject(1, userId)
+            ps.setString(2, game.id)
+            ps.setString(3, provider)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.toOrder() else null }
+        }
+        if (existing != null) return@withConn existing
+        val id = UUID.randomUUID()
+        c.prepareStatement(
+            "INSERT INTO orders (id,user_id,game_id,game_title,amount_cents,currency,provider) VALUES (?,?,?,?,?,?,?)"
+        ).use { ps ->
+            ps.setObject(1, id)
+            ps.setObject(2, userId)
+            ps.setString(3, game.id)
+            ps.setString(4, game.title)
+            ps.setInt(5, game.priceCents ?: 0)
+            ps.setString(6, game.currency)
+            ps.setString(7, provider)
+            ps.executeUpdate()
+        }
+        c.prepareStatement("SELECT $orderCols FROM orders WHERE id = ?").use { ps ->
+            ps.setObject(1, id)
+            ps.executeQuery().use { rs -> rs.next(); rs.toOrder() }
+        }
+    }
+
+    fun getOrder(userId: UUID, orderId: UUID): OrderDto? = withConn { c ->
+        c.prepareStatement("SELECT $orderCols FROM orders WHERE id = ? AND user_id = ?").use { ps ->
+            ps.setObject(1, orderId)
+            ps.setObject(2, userId)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.toOrder() else null }
+        }
+    }
+
+    fun getOrderAny(orderId: UUID): OrderDto? = withConn { c ->
+        c.prepareStatement("SELECT $orderCols FROM orders WHERE id = ?").use { ps ->
+            ps.setObject(1, orderId)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.toOrder() else null }
+        }
+    }
+
+    fun listOrders(userId: UUID): List<OrderDto> = withConn { c ->
+        c.prepareStatement("SELECT $orderCols FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").use { ps ->
+            ps.setObject(1, userId)
+            ps.executeQuery().use { rs ->
+                val list = ArrayList<OrderDto>()
+                while (rs.next()) list += rs.toOrder()
+                list
+            }
+        }
+    }
+
+    fun adminListOrders(): List<AdminOrderDto> = withConn { c ->
+        c.prepareStatement(
+            "SELECT o.id,o.game_id,o.game_title,o.amount_cents,o.currency,o.provider,o.status,o.created_at,o.paid_at,u.display_name " +
+                "FROM orders o LEFT JOIN users u ON u.id = o.user_id ORDER BY o.created_at DESC LIMIT 100"
+        ).use { ps ->
+            ps.executeQuery().use { rs ->
+                val list = ArrayList<AdminOrderDto>()
+                while (rs.next()) list += AdminOrderDto(rs.toOrder(), rs.getString("display_name"))
+                list
+            }
+        }
+    }
+
+    /** Marque la commande payée et ajoute le jeu à la bibliothèque, en une seule transaction. Idempotent. */
+    fun markOrderPaid(orderId: UUID): Boolean = withConn { c ->
+        c.autoCommit = false
+        try {
+            val row = c.prepareStatement("SELECT user_id, game_id, status FROM orders WHERE id = ? FOR UPDATE").use { ps ->
+                ps.setObject(1, orderId)
+                ps.executeQuery().use { rs ->
+                    if (rs.next()) Triple(rs.getObject("user_id", UUID::class.java), rs.getString("game_id"), rs.getString("status")) else null
+                }
+            }
+            if (row == null || row.third != "pending") {
+                c.rollback()
+                return@withConn false
+            }
+            c.prepareStatement("UPDATE orders SET status = 'paid', paid_at = now() WHERE id = ?").use { ps ->
+                ps.setObject(1, orderId)
+                ps.executeUpdate()
+            }
+            if (row.first != null) {
+                c.prepareStatement(
+                    "INSERT INTO user_games (user_id, game_id, source) SELECT ?, id, 'purchase' FROM games WHERE id = ? ON CONFLICT DO NOTHING"
+                ).use { ps ->
+                    ps.setObject(1, row.first)
+                    ps.setString(2, row.second)
+                    ps.executeUpdate()
+                }
+            }
+            c.commit()
+            true
+        } catch (e: Exception) {
+            c.rollback()
+            throw e
+        } finally {
+            c.autoCommit = true
+        }
+    }
+
+    fun markOrderFailed(orderId: UUID): Boolean = withConn { c ->
+        c.prepareStatement("UPDATE orders SET status = 'failed' WHERE id = ? AND status = 'pending'").use { ps ->
+            ps.setObject(1, orderId)
+            ps.executeUpdate() > 0
         }
     }
 }

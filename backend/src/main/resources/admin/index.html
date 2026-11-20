@@ -62,6 +62,19 @@
     </div>
     <div id="list"></div>
 
+    <div id="codesBox" class="card hidden">
+      <h2 id="codesTitle" style="margin-top:0">Codes générés</h2>
+      <p class="muted">Copie-les maintenant : ils ne seront plus jamais affichés (le serveur n'en garde que l'empreinte).</p>
+      <textarea id="codesText" readonly style="min-height:160px"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button id="copyCodes">Copier</button>
+        <button id="closeCodes" class="secondary">Fermer</button>
+      </div>
+    </div>
+
+    <h2>Commandes (paiement de test)</h2>
+    <div id="orders"></div>
+
     <form id="form" class="card hidden">
       <h2 id="formTitle" style="margin-top:0">Nouveau jeu</h2>
       <div class="grid2">
@@ -84,11 +97,22 @@
         <div><label for="f_size">Taille (Mo)</label><input id="f_size" type="number" min="0" value="0"></div>
         <div><label for="f_pkg">Nom de paquet Android</label><input id="f_pkg" placeholder="com.monstudio.monjeu"></div>
       </div>
+      <div class="grid2">
+        <div><label for="f_price">Prix (ex. 4.99 ; vide = pas en vente, 0 = gratuit)</label><input id="f_price" inputmode="decimal" placeholder="4.99"></div>
+        <div><label for="f_cur">Devise</label>
+          <select id="f_cur"><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option><option value="CDF">CDF (FC)</option></select></div>
+      </div>
       <label for="f_desc">Description</label><textarea id="f_desc" maxlength="4000"></textarea>
-      <label for="f_url">Adresse de l'APK (https://…)</label><input id="f_url" type="url" placeholder="https://github.com/…/releases/download/…/jeu.apk">
-      <label for="f_sha">Empreinte SHA-256 de l'APK</label><input id="f_sha" placeholder="64 caractères hexadécimaux">
-      <label for="f_file">Calculer à partir d'un fichier APK de ce téléphone (taille + empreinte)</label>
-      <input id="f_file" type="file" accept=".apk,application/vnd.android.package-archive">
+      <div class="grid2">
+        <div><label for="f_ver">Numéro de version (entier, +1 à chaque mise à jour)</label><input id="f_ver" type="number" min="1" value="1"></div>
+        <div><label for="f_vername">Nom de version</label><input id="f_vername" value="1.0" maxlength="32"></div>
+        <div><label for="f_engine">Moteur (ex. godot)</label><input id="f_engine" maxlength="32" placeholder="godot"></div>
+        <div><label for="f_engver">Version du moteur (ex. 4.3)</label><input id="f_engver" maxlength="32" placeholder="4.3"></div>
+      </div>
+      <label for="f_url">Adresse du paquet de jeu (https://…)</label><input id="f_url" type="url" placeholder="https://github.com/…/releases/download/…/jeu.pck">
+      <label for="f_sha">Empreinte SHA-256 du paquet (obligatoire avec l'adresse)</label><input id="f_sha" placeholder="64 caractères hexadécimaux">
+      <label for="f_file">Calculer à partir d'un fichier de ce téléphone (taille + empreinte)</label>
+      <input id="f_file" type="file">
       <div class="muted" id="fileInfo"></div>
       <label class="check"><input id="f_featured" type="checkbox"> Mis à la une</label>
       <label class="check"><input id="f_published" type="checkbox" checked> Publié (visible dans le Store)</label>
@@ -171,7 +195,7 @@
       left.appendChild(pill(g.published ? "publié" : "masqué", g.published ? "on" : "off"));
       if (g.featured) left.appendChild(pill("à la une", "on"));
       var m = document.createElement("div"); m.className = "muted";
-      m.textContent = g.id + " · " + g.category + " · " + g.sizeMb + " Mo" + (g.apkUrl ? " · APK ok" : " · sans APK");
+      m.textContent = g.id + " · v" + g.versionName + " · " + g.category + " · " + g.sizeMb + " Mo · " + (g.priceCents === null ? "code seulement" : g.priceCents === 0 ? "gratuit" : (g.priceCents / 100).toFixed(2) + " " + g.currency) + (g.packUrl ? " · paquet ok" : " · sans paquet");
       left.appendChild(m);
       var right = document.createElement("div"); right.className = "row";
       var edit = document.createElement("button"); edit.className = "secondary"; edit.textContent = "Modifier";
@@ -182,14 +206,47 @@
         api("DELETE", "/v1/admin/games/" + encodeURIComponent(g.id)).then(function () { toast("Jeu supprimé."); load(); })
           .catch(function (er) { toast(er.message, true); });
       };
-      right.appendChild(edit); right.appendChild(del);
+      var codes = document.createElement("button"); codes.className = "secondary"; codes.textContent = "Codes";
+      codes.onclick = function () { makeCodes(g); };
+      right.appendChild(edit); right.appendChild(codes); right.appendChild(del);
       c.appendChild(left); c.appendChild(right); list.appendChild(c);
     });
   }
 
+  function renderOrders(items) {
+    var box = $("orders");
+    box.textContent = "";
+    if (!items.length) {
+      var e = document.createElement("div"); e.className = "card muted"; e.textContent = "Aucune commande pour le moment.";
+      box.appendChild(e); return;
+    }
+    items.forEach(function (it) {
+      var o = it.order;
+      var c = document.createElement("div"); c.className = "card game";
+      var left = document.createElement("div");
+      var b = document.createElement("b"); b.textContent = o.gameTitle;
+      left.appendChild(b);
+      left.appendChild(pill(o.status, o.status === "paid" ? "on" : (o.status === "pending" ? "" : "off")));
+      if (o.sandbox) left.appendChild(pill("test"));
+      var m = document.createElement("div"); m.className = "muted";
+      m.textContent = (it.userName || "compte supprimé") + " · " + (o.amountCents / 100).toFixed(2) + " " + o.currency + " · " + o.createdAt.slice(0, 16).replace("T", " ");
+      left.appendChild(m);
+      c.appendChild(left);
+      if (o.status === "pending" && o.sandbox) {
+        var right = document.createElement("div"); right.className = "row";
+        var ok = document.createElement("button"); ok.textContent = "Simuler : payé";
+        ok.onclick = function () { api("POST", "/v1/admin/orders/" + o.id + "/sandbox-confirm").then(function () { toast("Paiement de test confirmé : le jeu est dans la bibliothèque du joueur."); load(); }).catch(function (er) { toast(er.message, true); }); };
+        var ko = document.createElement("button"); ko.className = "secondary"; ko.textContent = "Simuler : échec";
+        ko.onclick = function () { api("POST", "/v1/admin/orders/" + o.id + "/sandbox-fail").then(function () { load(); }).catch(function (er) { toast(er.message, true); }); };
+        right.appendChild(ok); right.appendChild(ko); c.appendChild(right);
+      }
+      box.appendChild(c);
+    });
+  }
+
   function load() {
-    return Promise.all([api("GET", "/v1/admin/games"), api("GET", "/v1/admin/stats")]).then(function (res) {
-      renderList(res[0].items); renderStats(res[1]); show(true);
+    return Promise.all([api("GET", "/v1/admin/games"), api("GET", "/v1/admin/stats"), api("GET", "/v1/admin/orders")]).then(function (res) {
+      renderList(res[0].items); renderStats(res[1]); renderOrders(res[2].items); show(true);
     }).catch(function (er) {
       if (er.status === 401 || er.status === 404) { show(false); try { sessionStorage.removeItem("hz_admin"); } catch (e) {} }
       toast(er.message, true);
@@ -199,17 +256,42 @@
   function openForm(g) {
     editing = g ? g.id : null;
     $("formTitle").textContent = g ? "Modifier « " + g.title + " »" : "Nouveau jeu";
-    var v = g || { id: "", title: "", publisher: "", category: "ACTION", description: "", ageRating: "12+", sizeMb: 0, compatibility: "DECLARED", packageName: "", apkUrl: "", apkSha256: "", featured: false, published: true };
+    var v = g || { id: "", title: "", publisher: "", category: "ACTION", description: "", ageRating: "12+", sizeMb: 0, compatibility: "DECLARED", packageName: "", packUrl: "", packSha256: "", versionCode: 1, versionName: "1.0", engine: "", engineVersion: "", priceCents: null, currency: "USD", featured: false, published: true };
     $("f_id").value = v.id; $("f_id").readOnly = !!g;
     $("f_title").value = v.title; $("f_publisher").value = v.publisher; $("f_category").value = v.category;
     $("f_age").value = v.ageRating; $("f_compat").value = v.compatibility; $("f_size").value = v.sizeMb;
     $("f_pkg").value = v.packageName || ""; $("f_desc").value = v.description;
-    $("f_url").value = v.apkUrl || ""; $("f_sha").value = v.apkSha256 || "";
+    $("f_url").value = v.packUrl || ""; $("f_sha").value = v.packSha256 || "";
+    $("f_ver").value = v.versionCode || 1; $("f_vername").value = v.versionName || "1.0";
+    $("f_engine").value = v.engine || ""; $("f_engver").value = v.engineVersion || "";
+    $("f_price").value = (v.priceCents === null || v.priceCents === undefined) ? "" : (v.priceCents / 100).toFixed(2);
+    $("f_cur").value = v.currency || "USD";
     $("f_featured").checked = !!v.featured; $("f_published").checked = v.published !== false;
     $("fileInfo").textContent = "";
     $("form").classList.remove("hidden");
     $("form").scrollIntoView({ behavior: "smooth" });
   }
+
+  function makeCodes(g) {
+    api("GET", "/v1/admin/codes/" + encodeURIComponent(g.id)).then(function (st) {
+      var n = prompt("« " + g.title + " » : " + st.total + " codes créés, " + st.redeemed + " utilisés.\nCombien de nouveaux codes générer ? (1 à 200)", "5");
+      if (!n) return null;
+      var count = parseInt(n, 10);
+      if (!(count >= 1 && count <= 200)) { toast("Nombre invalide.", true); return null; }
+      return api("POST", "/v1/admin/codes", { gameId: g.id, count: count });
+    }).then(function (res) {
+      if (!res) return;
+      $("codesTitle").textContent = "Codes pour « " + g.title + " »";
+      $("codesText").value = res.codes.join("\n");
+      $("codesBox").classList.remove("hidden");
+      $("codesBox").scrollIntoView({ behavior: "smooth" });
+    }).catch(function (er) { toast(er.message, true); });
+  }
+  $("copyCodes").onclick = function () {
+    var t = $("codesText"); t.select();
+    try { navigator.clipboard.writeText(t.value).then(function () { toast("Codes copiés."); }); } catch (e) { document.execCommand("copy"); toast("Codes copiés."); }
+  };
+  $("closeCodes").onclick = function () { $("codesText").value = ""; $("codesBox").classList.add("hidden"); };
 
   $("loginBtn").onclick = function () {
     token = $("token").value.trim();
@@ -243,8 +325,12 @@
       category: $("f_category").value, description: $("f_desc").value,
       ageRating: $("f_age").value.trim() || "12+", sizeMb: parseInt($("f_size").value, 10) || 0,
       compatibility: $("f_compat").value,
-      packageName: $("f_pkg").value.trim() || null, apkUrl: $("f_url").value.trim() || null,
-      apkSha256: $("f_sha").value.trim() || null,
+      packageName: $("f_pkg").value.trim() || null,
+      packUrl: $("f_url").value.trim() || null, packSha256: $("f_sha").value.trim() || null,
+      versionCode: parseInt($("f_ver").value, 10) || 1, versionName: $("f_vername").value.trim() || "1.0",
+      engine: $("f_engine").value.trim() || null, engineVersion: $("f_engver").value.trim() || null,
+      priceCents: $("f_price").value.trim() === "" ? null : Math.round(parseFloat($("f_price").value.replace(",", ".")) * 100),
+      currency: $("f_cur").value,
       featured: $("f_featured").checked, published: $("f_published").checked
     };
     $("saveBtn").disabled = true;

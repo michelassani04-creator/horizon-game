@@ -50,5 +50,13 @@ fun gameFromJson(o: JSONObject) = Game(
     packageName = o.stringOrNull("packageName"),
     apkUrl = o.stringOrNull("apkUrl"),
     apkSha256 = o.stringOrNull("apkSha256"),
+    packUrl = o.stringOrNull("packUrl"),
+    packSha256 = o.stringOrNull("packSha256"),
+    versionCode = o.optInt("versionCode", 1),
+    versionName = o.optString("versionName", "1.0"),
+    engine = o.stringOrNull("engine"),
+    engineVersion = o.stringOrNull("engineVersion"),
+    priceCents = if (o.has("priceCents") && !o.isNull("priceCents")) o.getInt("priceCents") else null,
+    currency = o.optString("currency", "USD"),
     featured = o.optBoolean("featured", false)
 )

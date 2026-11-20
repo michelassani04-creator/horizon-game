@@ -94,11 +94,63 @@ data class GameDto(
     /** Empreinte SHA-256 de l'APK : l'application la vérifie après téléchargement. */
     val apkSha256: String? = null,
     val featured: Boolean = false,
-    val published: Boolean = true
-)
+    val published: Boolean = true,
+    /** Paquet de jeu téléchargé dans l'application (visible seulement par les joueurs qui possèdent le jeu). */
+    val packUrl: String? = null,
+    val packSha256: String? = null,
+    /** Numéro de version croissant : sert à détecter les mises à jour. */
+    val versionCode: Int = 1,
+    val versionName: String = "1.0",
+    /** Moteur de jeu (ex. "godot") et sa version, pour savoir quel lecteur utiliser. */
+    val engine: String? = null,
+    val engineVersion: String? = null,
+    /** Prix en centimes : absent = pas en vente (code seulement), 0 = gratuit. */
+    val priceCents: Int? = null,
+    val currency: String = "USD"
+) {
+    /** Version publique du catalogue : sans aucun lien de téléchargement. */
+    fun toPublic() = copy(apkUrl = null, apkSha256 = null, packUrl = null, packSha256 = null)
+}
 
 @Serializable
 data class GameListResponse(val items: List<GameDto>, val total: Int, val page: Int, val pageSize: Int)
+
+@Serializable
+data class RedeemRequest(val code: String)
+
+@Serializable
+data class CreateCodesRequest(val gameId: String, val count: Int, val expiresInDays: Int? = null)
+
+@Serializable
+data class CreateCodesResponse(val gameId: String, val codes: List<String>)
+
+@Serializable
+data class CodeStats(val total: Int, val redeemed: Int)
+
+@Serializable
+data class CreateOrderRequest(val gameId: String, val provider: String = "sandbox")
+
+@Serializable
+data class OrderDto(
+    val id: String,
+    val gameId: String,
+    val gameTitle: String,
+    val amountCents: Int,
+    val currency: String,
+    val provider: String,
+    /** pending, paid, failed ou cancelled. Seul le serveur change ce statut. */
+    val status: String,
+    val createdAt: String,
+    val paidAt: String? = null,
+    val sandbox: Boolean = false,
+    val message: String? = null
+)
+
+@Serializable
+data class AdminOrderDto(val order: OrderDto, val userName: String?)
+
+@Serializable
+data class AdminOrdersResponse(val items: List<AdminOrderDto>)
 
 @Serializable
 data class AdminStats(val users: Int, val games: Int, val activeSessions: Int)

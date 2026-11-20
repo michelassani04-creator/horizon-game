@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.horizon.game.data.GameScanner
+import com.horizon.game.data.PackStore
 import com.horizon.game.data.Prefs
 import com.horizon.game.domain.model.Game
 
@@ -39,6 +40,20 @@ class AppState(private val prefs: Prefs) {
 
     fun gameById(id: String): Game? = catalog.firstOrNull { it.id == id }
 
+    /** Jeux possédés par le joueur connecté (avec liens de téléchargement). */
+    var ownedGames by mutableStateOf<List<Game>>(emptyList())
+        private set
+
+    fun updateOwned(games: List<Game>) {
+        ownedGames = games
+    }
+
+    fun ownedGame(id: String): Game? = ownedGames.firstOrNull { it.id == id }
+
+    /** Jeux dont le paquet est téléchargé sur cet appareil : identifiant -> version. */
+    var installedPacks by mutableStateOf<Map<String, Int>>(emptyMap())
+        private set
+
     val notificationsEnabled = mutableStateOf(prefs.bool("notifications", true))
     val reduceAnimations = mutableStateOf(prefs.bool("reduce_animations", false))
 
@@ -46,7 +61,7 @@ class AppState(private val prefs: Prefs) {
     val accent = mutableStateOf<androidx.compose.ui.graphics.Color?>(null)
 
     fun isInstalled(game: Game): Boolean =
-        game.packageName?.let { it in installedPackages } == true
+        game.id in installedPacks || game.packageName?.let { it in installedPackages } == true
 
     /** Jeux du Store installés sur cet appareil : le contenu de la bibliothèque. */
     val installedGames: List<Game>
@@ -72,9 +87,22 @@ class AppState(private val prefs: Prefs) {
     suspend fun refreshInstalled(context: Context) {
         val storePackages = catalog.mapNotNull { it.packageName }.toSet()
         installedPackages = GameScanner.installedStorePackages(context, storePackages)
+        val packs = PackStore(context, prefs)
+        installedPacks = (catalog.map { it.id } + ownedGames.map { it.id }).distinct()
+            .associateWith { packs.installedVersion(it) }
+            .filterValues { it > 0 }
     }
 
     fun launchGame(context: Context, game: Game) {
+        if (game.id in installedPacks) {
+            // Le lecteur de paquets (moteur de jeu intégré) n'est pas encore branché : on le dit clairement.
+            Toast.makeText(
+                context,
+                "Jeu téléchargé. Le moteur de jeu HORIZON n'est pas encore intégré : le lancement arrive bientôt.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
         val pkg = game.packageName
         if (pkg != null && GameScanner.launch(context, pkg)) {
             recent.remove(game.id)

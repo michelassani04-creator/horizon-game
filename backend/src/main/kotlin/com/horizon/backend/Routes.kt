@@ -6,6 +6,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
@@ -23,6 +24,7 @@ import org.slf4j.LoggerFactory
 import java.sql.SQLException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 
 private val log = LoggerFactory.getLogger("Routes")
 
@@ -55,6 +57,8 @@ private fun tooMany() = ApiException(HttpStatusCode.TooManyRequests, "rate_limit
 
 fun Application.installRoutes(config: AppConfig, store: Store) {
     val limiter = RateLimiter()
+    // Fournisseurs de paiement disponibles. Les vrais (M-Pesa, Orange, Airtel, cartes) s'ajouteront ici.
+    val providers: Map<String, PaymentProvider> = listOf<PaymentProvider>(SandboxProvider(config.sandboxWebhookSecret)).associateBy { it.id }
     // Hachage factice : sert à garder un temps de réponse constant quand le compte n'existe pas.
     val dummyHash = Security.hashPassword("horizon-dummy-password")
 
@@ -86,6 +90,8 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
                         minAppVersion = "0.3.0",
                         latestAppVersion = "0.3.0",
                         features = mapOf(
+                            "payments" to true,
+                            "paymentsSandbox" to true,
                             "phoneVerification" to false,
                             "emailVerification" to true,
                             "store" to true,
@@ -225,6 +231,65 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
                     }
                 }
 
+                post("/redeem") {
+                    val auth = call.authenticate(store)
+                    val req = call.body<RedeemRequest>()
+                    if (!limiter.allow("redeem:${auth.user.id}", 10, 900_000)) throw tooMany()
+                    val normalized = Security.normalizeCode(req.code)
+                    if (normalized.length != 16) throw badRequest("invalid_code", "Code invalide : il contient 16 caractères.")
+                    val game = io { store.redeemCode(auth.user.id, Security.sha256Hex(normalized)) }
+                        ?: throw ApiException(HttpStatusCode.NotFound, "invalid_code", "Code invalide, expiré ou déjà utilisé.")
+                    call.respond(game)
+                }
+
+                get("/games") {
+                    val auth = call.authenticate(store)
+                    val items = io { store.ownedGames(auth.user.id) }
+                    call.respond(GameListResponse(items, items.size, 1, items.size))
+                }
+
+                // Jeu gratuit (prix = 0) : ajout direct à la bibliothèque.
+                post("/games/{id}/claim") {
+                    val auth = call.authenticate(store)
+                    val gameId = Validation.gameId(call.parameters["id"] ?: "")
+                    val game = io { store.getGame(gameId) }
+                        ?: throw ApiException(HttpStatusCode.NotFound, "game_not_found", "Jeu introuvable.")
+                    if (game.priceCents != 0) throw badRequest("not_free", "Ce jeu n'est pas gratuit.")
+                    io { store.grantGame(auth.user.id, gameId, "free") }
+                    call.respond(io { store.getGame(gameId, includeUnpublished = true) } ?: game)
+                }
+
+                route("/orders") {
+                    post {
+                        val auth = call.authenticate(store)
+                        val req = call.body<CreateOrderRequest>()
+                        if (!limiter.allow("order:${auth.user.id}", 20, 3_600_000)) throw tooMany()
+                        val provider = providers[req.provider]
+                            ?: throw badRequest("invalid_provider", "Moyen de paiement indisponible.")
+                        val gameId = Validation.gameId(req.gameId)
+                        val game = io { store.getGame(gameId) }
+                            ?: throw ApiException(HttpStatusCode.NotFound, "game_not_found", "Jeu introuvable.")
+                        val price = game.priceCents
+                        if (price == null || price <= 0) throw badRequest("not_for_sale", "Ce jeu n'est pas en vente dans l'application.")
+                        if (io { store.ownsGame(auth.user.id, gameId) }) {
+                            throw ApiException(HttpStatusCode.Conflict, "already_owned", "Tu possèdes déjà ce jeu.")
+                        }
+                        val order = io { store.createOrder(auth.user.id, game, provider.id) }
+                        call.respond(HttpStatusCode.Created, order.copy(message = provider.initiate(order).message))
+                    }
+                    get {
+                        val auth = call.authenticate(store)
+                        call.respond(io { store.listOrders(auth.user.id) })
+                    }
+                    get("/{id}") {
+                        val auth = call.authenticate(store)
+                        val id = runCatching { UUID.fromString(call.parameters["id"] ?: "") }.getOrNull()
+                            ?: throw ApiException(HttpStatusCode.NotFound, "order_not_found", "Commande introuvable.")
+                        call.respond(io { store.getOrder(auth.user.id, id) }
+                            ?: throw ApiException(HttpStatusCode.NotFound, "order_not_found", "Commande introuvable."))
+                    }
+                }
+
                 route("/favorites") {
                     get {
                         val auth = call.authenticate(store)
@@ -251,6 +316,17 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
                 }
             }
 
+            // ---------- Notifications des fournisseurs de paiement (authentifiées par signature) ----------
+            post("/payments/webhook/{provider}") {
+                val provider = providers[call.parameters["provider"] ?: ""]
+                    ?: throw ApiException(HttpStatusCode.NotFound, "not_found", "Introuvable.")
+                val body = call.receiveText()
+                val result = provider.verifyWebhook({ call.request.headers[it] }, body)
+                    ?: throw ApiException(HttpStatusCode.Unauthorized, "invalid_signature", "Signature invalide.")
+                io { if (result.paid) store.markOrderPaid(result.orderId) else store.markOrderFailed(result.orderId) }
+                call.respond(mapOf("status" to "ok"))
+            }
+
             // ---------- HORIZON Store (public) ----------
             route("/games") {
                 get {
@@ -261,18 +337,19 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
                     }
                     val page = (q["page"]?.toIntOrNull() ?: 1).coerceAtLeast(1)
                     val pageSize = (q["pageSize"]?.toIntOrNull() ?: 50).coerceIn(1, 100)
-                    call.respond(io { store.listGames(q["query"]?.take(80), category, page, pageSize) })
+                    val result = io { store.listGames(q["query"]?.take(80), category, page, pageSize) }
+                    call.respond(result.copy(items = result.items.map { it.toPublic() }))
                 }
                 get("/{id}") {
                     val id = call.parameters["id"] ?: ""
                     val game = io { store.getGame(id) }
                         ?: throw ApiException(HttpStatusCode.NotFound, "game_not_found", "Jeu introuvable.")
-                    call.respond(game)
+                    call.respond(game.toPublic())
                 }
             }
 
             // ---------- Publication de jeux (administrateur) ----------
-            adminRoutes(config, store, limiter)
+            adminRoutes(config, store, limiter, providers)
         }
     }
 }
@@ -282,7 +359,7 @@ private val adminPageHtml: String by lazy {
         ?: "<h1>Page d'administration introuvable</h1>"
 }
 
-private fun Route.adminRoutes(config: AppConfig, store: Store, limiter: RateLimiter) {
+private fun Route.adminRoutes(config: AppConfig, store: Store, limiter: RateLimiter, providers: Map<String, PaymentProvider>) {
     fun ApplicationCall.requireAdmin() {
         val expected = config.adminToken
             ?: throw ApiException(HttpStatusCode.NotFound, "not_found", "Introuvable.")
@@ -296,9 +373,56 @@ private fun Route.adminRoutes(config: AppConfig, store: Store, limiter: RateLimi
         }
     }
 
+    get("/admin/orders") {
+        call.requireAdmin()
+        call.respond(AdminOrdersResponse(io { store.adminListOrders() }))
+    }
+
+    // Simule la notification d'un fournisseur de TEST : réservé aux commandes « sandbox ».
+    post("/admin/orders/{id}/sandbox-confirm") {
+        call.requireAdmin()
+        val order = io { runCatching { UUID.fromString(call.parameters["id"] ?: "") }.getOrNull()?.let { store.getOrderAny(it) } }
+            ?: throw ApiException(HttpStatusCode.NotFound, "order_not_found", "Commande introuvable.")
+        if (providers[order.provider]?.sandbox != true) throw badRequest("not_sandbox", "Seules les commandes de test peuvent être simulées.")
+        val ok = io { store.markOrderPaid(UUID.fromString(order.id)) }
+        if (!ok) throw ApiException(HttpStatusCode.Conflict, "not_pending", "Cette commande n'est plus en attente.")
+        log.info("Commande de test {} confirmée", order.id)
+        call.respond(mapOf("status" to "paid"))
+    }
+
+    post("/admin/orders/{id}/sandbox-fail") {
+        call.requireAdmin()
+        val order = io { runCatching { UUID.fromString(call.parameters["id"] ?: "") }.getOrNull()?.let { store.getOrderAny(it) } }
+            ?: throw ApiException(HttpStatusCode.NotFound, "order_not_found", "Commande introuvable.")
+        if (providers[order.provider]?.sandbox != true) throw badRequest("not_sandbox", "Seules les commandes de test peuvent être simulées.")
+        io { store.markOrderFailed(UUID.fromString(order.id)) }
+        call.respond(mapOf("status" to "failed"))
+    }
+
     get("/admin/stats") {
         call.requireAdmin()
         call.respond(io { store.stats() })
+    }
+
+    post("/admin/codes") {
+        call.requireAdmin()
+        val req = call.body<CreateCodesRequest>()
+        Validation.gameId(req.gameId)
+        if (req.count !in 1..200) throw badRequest("invalid_count", "Nombre de codes : de 1 à 200.")
+        if (req.expiresInDays != null && req.expiresInDays !in 1..3650) throw badRequest("invalid_expiry", "Durée de validité invalide.")
+        io { store.getGame(req.gameId, includeUnpublished = true) }
+            ?: throw ApiException(HttpStatusCode.NotFound, "game_not_found", "Jeu introuvable.")
+        val codes = List(req.count) { Security.newRedeemCode() }
+        val expires = req.expiresInDays?.let { Instant.now().plus(it.toLong(), ChronoUnit.DAYS) }
+        io { store.createCodes(req.gameId, codes.map { Security.sha256Hex(Security.normalizeCode(it)) }, expires) }
+        log.info("{} codes générés pour le jeu {}", codes.size, req.gameId)
+        call.respond(HttpStatusCode.Created, CreateCodesResponse(req.gameId, codes))
+    }
+
+    get("/admin/codes/{gameId}") {
+        call.requireAdmin()
+        val id = Validation.gameId(call.parameters["gameId"] ?: "")
+        call.respond(io { store.codeStats(id) })
     }
 
     route("/admin/games") {

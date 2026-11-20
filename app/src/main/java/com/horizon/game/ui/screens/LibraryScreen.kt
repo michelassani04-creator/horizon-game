@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,11 +40,15 @@ fun LibraryScreen(
     appState: AppState,
     onOpenGame: (String) -> Unit,
     onOpenStore: () -> Unit,
+    onRedeem: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by rememberSaveable { mutableStateOf("") }
 
     val installed = appState.installedGames.filter { it.title.contains(query, ignoreCase = true) }
+    val toDownload = appState.ownedGames.filter {
+        !appState.isInstalled(it) && it.title.contains(query, ignoreCase = true)
+    }
     val wishlist = appState.catalog.filter {
         appState.isFavorite(it.id) && !appState.isInstalled(it) && it.title.contains(query, ignoreCase = true)
     }
@@ -58,8 +63,9 @@ fun LibraryScreen(
                 placeholder = { Text("Rechercher dans mes jeux") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Recherche") }
             )
+            OutlinedButton(onClick = onRedeem, modifier = Modifier.padding(start = 12.dp)) { Text("Saisir un code") }
         }
-        if (installed.isEmpty() && wishlist.isEmpty()) {
+        if (installed.isEmpty() && wishlist.isEmpty() && toDownload.isEmpty()) {
             EmptyState(
                 title = "Bibliothèque vide",
                 message = "Les jeux installés depuis le HORIZON Store apparaissent ici, avec le bouton Jouer. " +
@@ -80,6 +86,19 @@ fun LibraryScreen(
                             title = game.title,
                             seed = game.id,
                             badge = "INSTALLÉ",
+                            favorite = appState.isFavorite(game.id),
+                            reduce = appState.reduceAnimations.value,
+                            onClick = { onOpenGame(game.id) }
+                        )
+                    }
+                }
+                if (toDownload.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) { SectionTitle("À télécharger") }
+                    items(toDownload, key = { "dl:" + it.id }) { game ->
+                        GameTile(
+                            title = game.title,
+                            seed = game.id,
+                            badge = "POSSÉDÉ",
                             favorite = appState.isFavorite(game.id),
                             reduce = appState.reduceAnimations.value,
                             onClick = { onOpenGame(game.id) }

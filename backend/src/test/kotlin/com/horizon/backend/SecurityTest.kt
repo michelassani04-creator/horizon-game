@@ -45,4 +45,28 @@ class SecurityTest {
         assertFailsWith<ApiException> { Validation.password("court") }
         assertFailsWith<ApiException> { Validation.displayName("x") }
     }
+
+    @Test
+    fun redeemCodes() {
+        val c = Security.newRedeemCode()
+        assertTrue(Regex("^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$").matches(c))
+        assertEquals(16, Security.normalizeCode(c).length)
+        assertEquals(Security.normalizeCode(c), Security.normalizeCode(c.lowercase().replace("-", " ")))
+    }
+
+    @Test
+    fun sandboxWebhookSignature() {
+        val secret = "0123456789012345678901234567890123"
+        val provider = SandboxProvider(secret)
+        val id = java.util.UUID.randomUUID()
+        val body = """{"orderId":"$id","status":"paid"}"""
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+        mac.init(javax.crypto.spec.SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
+        val sig = mac.doFinal(body.toByteArray()).joinToString("") { "%02x".format(it) }
+        val ok = provider.verifyWebhook({ if (it == "X-Horizon-Signature") sig else null }, body)
+        assertEquals(id, ok?.orderId)
+        assertTrue(ok?.paid == true)
+        assertEquals(null, provider.verifyWebhook({ "mauvaise-signature" }, body))
+        assertEquals(null, SandboxProvider(null).verifyWebhook({ sig }, body))
+    }
 }

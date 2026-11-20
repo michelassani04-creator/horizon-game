@@ -31,6 +31,30 @@ data class Game(
     /** Adresse de téléchargement de l'APK et son empreinte SHA-256 (vérifiée avant installation). */
     val apkUrl: String? = null,
     val apkSha256: String? = null,
+    /** Paquet de jeu (téléchargé dans l'application, visible seulement si le joueur possède le jeu). */
+    val packUrl: String? = null,
+    val packSha256: String? = null,
+    /** Numéro de version croissant : détecte les mises à jour. */
+    val versionCode: Int = 1,
+    val versionName: String = "1.0",
+    val engine: String? = null,
+    val engineVersion: String? = null,
+    /** Prix en centimes : null = pas en vente (code seulement), 0 = gratuit. */
+    val priceCents: Int? = null,
+    val currency: String = "USD",
     /** Mis en avant dans la bannière du Store. */
     val featured: Boolean = false
 )
+
+/** Prix lisible (« 4,99 $ », « Gratuit »), ou null si le jeu n'est pas en vente. */
+fun Game.priceLabel(): String? {
+    val cents = priceCents ?: return null
+    if (cents == 0) return "Gratuit"
+    val amount = "%d,%02d".format(cents / 100, cents % 100)
+    return when (currency) {
+        "USD" -> "$amount $"
+        "EUR" -> "$amount €"
+        "CDF" -> "$amount FC"
+        else -> "$amount $currency"
+    }
+}

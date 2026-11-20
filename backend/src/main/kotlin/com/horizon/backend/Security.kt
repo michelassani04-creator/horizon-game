@@ -46,6 +46,16 @@ object Security {
 
     fun newCode(): String = "%06d".format(random.nextInt(1_000_000))
 
+    private const val CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+    /** Code de téléchargement lisible : XXXX-XXXX-XXXX-XXXX (80 bits, sans caractères ambigus). */
+    fun newRedeemCode(): String =
+        (0 until 16).map { CODE_ALPHABET[random.nextInt(CODE_ALPHABET.length)] }
+            .chunked(4).joinToString("-") { it.joinToString("") }
+
+    /** Majuscules, sans tirets ni espaces. */
+    fun normalizeCode(raw: String): String = raw.uppercase().filter { it.isLetterOrDigit() }
+
     fun constantTimeEquals(a: String, b: String): Boolean =
         MessageDigest.isEqual(a.toByteArray(Charsets.UTF_8), b.toByteArray(Charsets.UTF_8))
 }
@@ -133,10 +143,32 @@ object Validation {
         g.apkSha256?.let {
             if (!sha256Regex.matches(it)) throw badRequest("invalid_sha256", "Empreinte SHA-256 invalide (64 caractères hexadécimaux).")
         }
+        g.packUrl?.let {
+            if (!it.startsWith("https://")) throw badRequest("invalid_pack_url", "L'adresse du paquet doit commencer par https://.")
+        }
+        g.packSha256?.let {
+            if (!sha256Regex.matches(it)) throw badRequest("invalid_pack_sha256", "Empreinte SHA-256 du paquet invalide (64 caractères hexadécimaux).")
+        }
+        if (g.packUrl != null && g.packSha256 == null) {
+            throw badRequest("pack_sha256_required", "L'empreinte SHA-256 est obligatoire avec une adresse de paquet.")
+        }
+        g.priceCents?.let {
+            if (it !in 0..10_000_000) throw badRequest("invalid_price", "Prix invalide.")
+        }
+        if (g.currency !in setOf("USD", "EUR", "CDF")) throw badRequest("invalid_currency", "Devise non prise en charge (USD, EUR ou CDF).")
+        if (g.versionCode < 1) throw badRequest("invalid_version", "Le numéro de version doit être au moins 1.")
+        if (g.versionName.trim().length !in 1..32) throw badRequest("invalid_version_name", "Nom de version : 1 à 32 caractères.")
+        if ((g.engine?.length ?: 0) > 32 || (g.engineVersion?.length ?: 0) > 32) {
+            throw badRequest("invalid_engine", "Moteur : 32 caractères maximum.")
+        }
         return g.copy(
             title = g.title.trim(),
             publisher = g.publisher.trim(),
-            apkSha256 = g.apkSha256?.lowercase()
+            apkSha256 = g.apkSha256?.lowercase(),
+            packSha256 = g.packSha256?.lowercase(),
+            versionName = g.versionName.trim(),
+            engine = g.engine?.trim()?.takeIf { it.isNotEmpty() },
+            engineVersion = g.engineVersion?.trim()?.takeIf { it.isNotEmpty() }
         )
     }
 }

@@ -15,6 +15,7 @@ API HORIZON ID + HORIZON Store. Kotlin · Ktor · PostgreSQL · Docker.
 | `POST /v1/me/verify/request` · `/confirm` | Vérification e-mail par code à 6 chiffres |
 | `GET/PUT /v1/me/favorites` · `PUT/DELETE /v1/me/favorites/{gameId}` | Favoris synchronisés |
 | `GET /v1/games` (`query`, `category`, `page`, `pageSize`) · `GET /v1/games/{id}` | Catalogue du Store |
+| `POST /v1/me/redeem` · `GET /v1/me/games` | Utiliser un code de téléchargement · bibliothèque du joueur (avec liens de téléchargement) |
 | `GET /admin` | **Page d'administration** (publier, modifier, supprimer des jeux depuis le téléphone ; demande le `ADMIN_TOKEN`) |
 | `GET /v1/admin/games` · `PUT/DELETE /v1/admin/games/{id}` · `GET /v1/admin/stats` | API d'administration (en-tête `X-Admin-Token`) |
 
@@ -39,7 +40,11 @@ Avec un nom de domaine (HTTPS automatique) : dans `.env` mettez `DOMAIN=api.exem
 docker compose --profile https up -d --build
 ```
 
-## Publier un jeu
+## Jeux = paquets téléchargés dans l'application
+Un jeu est un **paquet** (fichier de données, ex. `.pck` Godot) hébergé en HTTPS (GitHub Releases convient). Dans `/admin`, renseigne l'adresse du paquet, son **SHA-256** (obligatoire), la version et le moteur. Les liens de téléchargement ne sont **jamais** dans le catalogue public : seuls les joueurs qui possèdent le jeu les reçoivent. Dans `/admin`, le bouton **Codes** génère des codes de téléchargement à donner aux joueurs.
+Limite à connaître : un lien GitHub Releases est public pour qui le connaît ; une vraie protection viendra avec le stockage S3 à liens signés (HORIZON MEMORY).
+
+## Publier un jeu (API)
 
 ```bash
 curl -X PUT https://api.exemple.com/v1/admin/games/mon-jeu \
@@ -57,3 +62,9 @@ Catégories : `ACTION`, `RACING`, `PUZZLE`, `ADVENTURE`, `STRATEGY`.
 ```bash
 docker compose exec db pg_dump -U horizon horizon > sauvegarde.sql
 ```
+
+## Achats (v0.5.0)
+
+- `POST /v1/me/orders {gameId, provider:"sandbox"}` crée une commande ; seul le serveur la passe en `paid`.
+- Fournisseur `sandbox` = paiement de TEST (aucun argent réel). Confirmation depuis `/admin` (Commandes → « Simuler : payé ») ou par webhook signé HMAC-SHA256 (`X-Horizon-Signature`) si `SANDBOX_WEBHOOK_SECRET` (≥ 24 caractères) est défini.
+- `POST /v1/me/games/{id}/claim` : jeux gratuits (prix 0).
