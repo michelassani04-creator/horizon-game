@@ -6,341 +6,571 @@
 <meta name="robots" content="noindex">
 <title>HORIZON Admin</title>
 <style>
-  :root { --bg:#0A0E17; --surface:#161F30; --border:#26354A; --blue:#1683FF; --red:#FF2E55; --text:#E8EEF8; --muted:#9AA8BF; }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.4 system-ui, sans-serif; }
-  header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); }
-  h1 { font-size:18px; margin:0; letter-spacing:.12em; }
-  h1 span { color:var(--blue); }
-  main { max-width:900px; margin:0 auto; padding:16px; }
-  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; }
-  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
-  input, select, textarea { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font:inherit; }
-  textarea { min-height:90px; }
-  button { padding:10px 14px; border:0; border-radius:10px; background:var(--blue); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
-  button.secondary { background:transparent; border:1px solid var(--border); color:var(--text); }
-  button.danger { background:var(--red); }
-  button:disabled { opacity:.5; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  @media (max-width:560px) { .grid2 { grid-template-columns:1fr; } }
-  .game { display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; }
-  .game b { font-size:17px; }
-  .muted { color:var(--muted); font-size:13px; }
-  .pill { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; background:var(--border); margin-left:6px; }
-  .pill.on { background:var(--blue); }
-  .pill.off { background:var(--red); }
-  .stats { display:flex; gap:10px; flex-wrap:wrap; }
-  .stat { flex:1; min-width:100px; text-align:center; }
-  .stat b { display:block; font-size:24px; color:var(--blue); }
-  #toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--surface); border:1px solid var(--border); padding:12px 16px; border-radius:12px; max-width:90%; display:none; }
-  #toast.err { border-color:var(--red); }
+  :root {
+    --night:#0B1120; --deck:#131C2F; --lift:#1A2540; --edge:#25334B; --blue:#2F8CFF; --blue-ink:#0A1A33;
+    --red:#FF3B5C; --amber:#F5B544; --green:#3DD6A0; --mist:#E6ECF7; --slate:#8D9BB5;
+    --r:10px; --side:232px;
+  }
+  * { box-sizing:border-box; }
+  html { color-scheme:dark; }
+  body { margin:0; background:var(--night); color:var(--mist); font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3 { margin:0; letter-spacing:-.02em; }
+  button,input,select,textarea { font:inherit; color:inherit; }
+  :focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
   .hidden { display:none !important; }
-  .check { display:flex; gap:8px; align-items:center; margin:10px 0 0; color:var(--text); font-size:15px; }
+  .muted { color:var(--slate); }
+  .num { font-variant-numeric:tabular-nums; }
+
+  /* Ligne d'horizon : le seul décor de la page */
+  .horizon { height:2px; background:linear-gradient(90deg,transparent,var(--blue) 30%,var(--red) 70%,transparent); box-shadow:0 0 18px 1px rgba(47,140,255,.45); }
+
+  /* Connexion */
+  #login { min-height:100vh; display:grid; place-items:center; padding:24px; }
+  .login-box { width:min(420px,100%); }
+  .brand { font-weight:800; letter-spacing:.14em; font-size:15px; }
+  .brand b { color:var(--blue); font-weight:800; }
+  .login-box h1 { font-size:30px; margin:28px 0 8px; }
+  .login-box p { margin:0 0 22px; color:var(--slate); }
+
+  /* Structure */
+  #app { display:grid; grid-template-columns:var(--side) 1fr; min-height:100vh; }
+  aside { background:var(--deck); border-right:1px solid var(--edge); padding:20px 14px; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:22px; }
+  nav { display:flex; flex-direction:column; gap:2px; }
+  nav button { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; text-align:left; background:none; border:0; border-radius:8px; padding:10px 12px; color:var(--slate); cursor:pointer; font-weight:550; }
+  nav button:hover { background:var(--lift); color:var(--mist); }
+  nav button[aria-current="page"] { background:var(--lift); color:#fff; box-shadow:inset 3px 0 0 var(--blue); }
+  .badge { min-width:20px; padding:1px 7px; border-radius:999px; background:var(--red); color:#fff; font-size:12px; font-weight:700; text-align:center; }
+  .side-foot { margin-top:auto; }
+  main { padding:28px clamp(16px,3vw,40px) 80px; max-width:1100px; width:100%; }
+  .page-head { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:22px; }
+  .page-head h2 { font-size:26px; }
+
+  /* Boutons */
+  .btn { border:1px solid transparent; background:var(--blue); color:#fff; padding:9px 14px; border-radius:var(--r); font-weight:650; cursor:pointer; transition:filter .15s, transform .05s; }
+  .btn:hover { filter:brightness(1.1); }
+  .btn:active { transform:translateY(1px); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn.ghost { background:transparent; border-color:var(--edge); color:var(--mist); }
+  .btn.ghost:hover { background:var(--lift); }
+  .btn.danger { background:transparent; border-color:rgba(255,59,92,.5); color:var(--red); }
+  .btn.sm { padding:6px 10px; font-size:13px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+  /* Chiffres clés : une bande, pas des cartes */
+  .figures { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); border:1px solid var(--edge); border-radius:12px; background:var(--deck); margin-bottom:26px; }
+  .figure { padding:16px 18px; border-right:1px solid var(--edge); }
+  .figure:last-child { border-right:0; }
+  .figure b { display:block; font-size:28px; letter-spacing:-.03em; }
+  .figure span { color:var(--slate); font-size:13px; }
+
+  /* Listes */
+  .list { border:1px solid var(--edge); border-radius:12px; background:var(--deck); overflow:hidden; }
+  .item { display:grid; grid-template-columns:1fr auto; gap:6px 16px; align-items:center; padding:14px 18px; border-top:1px solid var(--edge); }
+  .item:first-child { border-top:0; }
+  .item .t { font-weight:650; font-size:16px; }
+  .item .s { color:var(--slate); font-size:13px; margin-top:2px; overflow-wrap:anywhere; }
+  .empty { padding:28px 18px; color:var(--slate); text-align:center; }
+  .todo { border-left:3px solid var(--amber); padding:10px 14px; background:var(--deck); border-radius:0 10px 10px 0; margin-bottom:8px; display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; }
+
+  .pill { display:inline-block; font-size:12px; font-weight:650; padding:2px 9px; border-radius:999px; margin-left:8px; vertical-align:middle; background:var(--edge); color:var(--mist); }
+  .pill.ok { background:rgba(61,214,160,.16); color:var(--green); }
+  .pill.wait { background:rgba(245,181,68,.16); color:var(--amber); }
+  .pill.bad { background:rgba(255,59,92,.16); color:var(--red); }
+  .pill.info { background:rgba(47,140,255,.18); color:#7DB5FF; }
+
+  /* Fenêtres */
+  dialog { border:1px solid var(--edge); border-radius:14px; background:var(--deck); color:var(--mist); padding:0; width:min(640px,calc(100% - 24px)); max-height:92vh; }
+  dialog::backdrop { background:rgba(4,8,16,.7); }
+  dialog form { padding:22px; display:flex; flex-direction:column; gap:12px; max-height:92vh; overflow:auto; }
+  dialog h3 { font-size:20px; }
+  .field label { display:block; font-size:13px; color:var(--slate); margin-bottom:4px; }
+  .field .hint { font-size:12px; color:var(--slate); margin-top:3px; }
+  input,select,textarea { width:100%; padding:10px 12px; border-radius:var(--r); border:1px solid var(--edge); background:var(--night); }
+  textarea { min-height:96px; resize:vertical; }
+  .check { display:flex; gap:10px; align-items:center; }
   .check input { width:auto; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+  pre.secret { background:var(--night); border:1px solid var(--edge); border-radius:var(--r); padding:12px; white-space:pre-wrap; word-break:break-all; user-select:all; font:13px/1.5 ui-monospace,Menlo,monospace; max-height:280px; overflow:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--edge); }
+  th { color:var(--slate); font-weight:600; font-size:13px; }
+  td.r,th.r { text-align:right; }
+
+  #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:var(--lift); border:1px solid var(--edge); padding:12px 18px; border-radius:12px; max-width:92%; display:none; z-index:50; box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  #toast.err { border-color:var(--red); }
+
+  @media (max-width:860px) {
+    #app { grid-template-columns:minmax(0,1fr); grid-template-rows:auto 1fr; }
+    #app > div { min-width:0; }
+    .item > * { min-width:0; }
+    aside { position:static; height:auto; flex-direction:row; align-items:center; padding:10px 12px; overflow-x:auto; gap:12px; border-right:0; border-bottom:1px solid var(--edge); }
+    aside .brand { display:none; }
+    nav { flex-direction:row; }
+    nav button { white-space:nowrap; width:auto; }
+    nav button[aria-current="page"] { box-shadow:inset 0 -3px 0 var(--blue); }
+    .side-foot { margin:0 0 0 auto; }
+    .item { grid-template-columns:1fr; }
+    .two { grid-template-columns:1fr; }
+    .figure { border-right:0; border-bottom:1px solid var(--edge); }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>HORIZON <span>ADMIN</span></h1>
-  <button id="logout" class="secondary hidden">Déconnexion</button>
-</header>
-<main>
-  <section id="login" class="card">
-    <h2 style="margin-top:0">Connexion administrateur</h2>
-    <label for="token">Jeton administrateur (ADMIN_TOKEN)</label>
-    <input id="token" type="password" autocomplete="off" placeholder="Colle ton jeton ici">
-    <p class="muted">Le jeton reste dans cet onglet uniquement et n'est jamais enregistré ailleurs.</p>
-    <button id="loginBtn">Se connecter</button>
-  </section>
 
-  <section id="app" class="hidden">
-    <div class="card stats" id="stats"></div>
-    <div class="row" style="margin-bottom:12px">
-      <button id="newGame">+ Nouveau jeu</button>
-      <button id="reload" class="secondary">Actualiser</button>
-    </div>
-    <div id="list"></div>
+<section id="login">
+  <div class="login-box">
+    <div class="brand">HORIZON <b>ADMIN</b></div>
+    <h1>Connexion</h1>
+    <p>Colle ton jeton administrateur (la variable ADMIN_TOKEN de Render).</p>
+    <div class="field"><label for="token">Jeton administrateur</label><input id="token" type="password" autocomplete="off"></div>
+    <div class="actions" style="justify-content:flex-start;margin-top:14px"><button id="loginBtn" class="btn">Se connecter</button></div>
+  </div>
+</section>
 
-    <div id="codesBox" class="card hidden">
-      <h2 id="codesTitle" style="margin-top:0">Codes générés</h2>
-      <p class="muted">Copie-les maintenant : ils ne seront plus jamais affichés (le serveur n'en garde que l'empreinte).</p>
-      <textarea id="codesText" readonly style="min-height:160px"></textarea>
-      <div class="row" style="margin-top:10px">
-        <button id="copyCodes">Copier</button>
-        <button id="closeCodes" class="secondary">Fermer</button>
-      </div>
-    </div>
+<div id="app" class="hidden">
+  <aside>
+    <div class="brand">HORIZON <b>ADMIN</b></div>
+    <nav id="nav"></nav>
+    <div class="side-foot"><button id="logout" class="btn ghost sm">Se déconnecter</button></div>
+  </aside>
+  <div>
+    <div class="horizon"></div>
+    <main id="main"></main>
+  </div>
+</div>
 
-    <h2>Commandes (paiement de test)</h2>
-    <div id="orders"></div>
-
-    <form id="form" class="card hidden">
-      <h2 id="formTitle" style="margin-top:0">Nouveau jeu</h2>
-      <div class="grid2">
-        <div><label for="f_id">Identifiant (minuscules, chiffres, tirets)</label><input id="f_id" required pattern="[a-z0-9][a-z0-9-]{1,59}"></div>
-        <div><label for="f_title">Titre</label><input id="f_title" required maxlength="80"></div>
-        <div><label for="f_publisher">Éditeur</label><input id="f_publisher" required maxlength="80"></div>
-        <div><label for="f_category">Catégorie</label>
-          <select id="f_category">
-            <option value="ACTION">Action</option><option value="RACING">Course</option>
-            <option value="PUZZLE">Réflexion</option><option value="ADVENTURE">Aventure</option>
-            <option value="STRATEGY">Stratégie</option>
-          </select></div>
-        <div><label for="f_age">Âge conseillé (ex. 7+, 12+)</label><input id="f_age" value="12+"></div>
-        <div><label for="f_compat">Compatibilité</label>
-          <select id="f_compat">
-            <option value="DECLARED">Déclarée par l'éditeur</option>
-            <option value="VERIFIED">Vérifiée</option>
-            <option value="UNKNOWN">Inconnue</option>
-          </select></div>
-        <div><label for="f_size">Taille (Mo)</label><input id="f_size" type="number" min="0" value="0"></div>
-        <div><label for="f_pkg">Nom de paquet Android</label><input id="f_pkg" placeholder="com.monstudio.monjeu"></div>
-      </div>
-      <div class="grid2">
-        <div><label for="f_price">Prix (ex. 4.99 ; vide = pas en vente, 0 = gratuit)</label><input id="f_price" inputmode="decimal" placeholder="4.99"></div>
-        <div><label for="f_cur">Devise</label>
-          <select id="f_cur"><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option><option value="CDF">CDF (FC)</option></select></div>
-      </div>
-      <label for="f_desc">Description</label><textarea id="f_desc" maxlength="4000"></textarea>
-      <div class="grid2">
-        <div><label for="f_ver">Numéro de version (entier, +1 à chaque mise à jour)</label><input id="f_ver" type="number" min="1" value="1"></div>
-        <div><label for="f_vername">Nom de version</label><input id="f_vername" value="1.0" maxlength="32"></div>
-        <div><label for="f_engine">Moteur (ex. godot)</label><input id="f_engine" maxlength="32" placeholder="godot"></div>
-        <div><label for="f_engver">Version du moteur (ex. 4.3)</label><input id="f_engver" maxlength="32" placeholder="4.3"></div>
-      </div>
-      <label for="f_url">Adresse du paquet de jeu (https://…)</label><input id="f_url" type="url" placeholder="https://github.com/…/releases/download/…/jeu.pck">
-      <label for="f_sha">Empreinte SHA-256 du paquet (obligatoire avec l'adresse)</label><input id="f_sha" placeholder="64 caractères hexadécimaux">
-      <label for="f_file">Calculer à partir d'un fichier de ce téléphone (taille + empreinte)</label>
-      <input id="f_file" type="file">
-      <div class="muted" id="fileInfo"></div>
-      <label class="check"><input id="f_featured" type="checkbox"> Mis à la une</label>
-      <label class="check"><input id="f_published" type="checkbox" checked> Publié (visible dans le Store)</label>
-      <div class="row" style="margin-top:14px">
-        <button type="submit" id="saveBtn">Enregistrer</button>
-        <button type="button" id="cancel" class="secondary">Annuler</button>
-      </div>
-    </form>
-  </section>
-</main>
-<div id="toast"></div>
+<dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+<div id="toast" role="status"></div>
 
 <script>
 (function () {
+  "use strict";
   var token = "";
   try { token = sessionStorage.getItem("hz_admin") || ""; } catch (e) {}
   var $ = function (id) { return document.getElementById(id); };
-  var editing = null;
+  var state = { tab: "home", games: [], stats: null, orders: [], reviews: [], publishers: [], partners: [] };
 
-  function toast(msg, isErr) {
-    var t = $("toast");
-    t.textContent = msg;
-    t.className = isErr ? "err" : "";
-    t.style.display = "block";
-    clearTimeout(toast.h);
-    toast.h = setTimeout(function () { t.style.display = "none"; }, 4000);
+  /* ---------- Outils ---------- */
+  function h(tag, attrs, kids) {
+    var el = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === "class") el.className = attrs[k];
+      else if (k === "text") el.textContent = attrs[k];
+      else if (k.slice(0, 2) === "on") el[k] = attrs[k];
+      else el.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) { if (c) el.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return el;
   }
-
+  function toast(msg, isErr) {
+    var t = $("toast"); t.textContent = msg; t.className = isErr ? "err" : ""; t.style.display = "block";
+    clearTimeout(toast.h); toast.h = setTimeout(function () { t.style.display = "none"; }, 4500);
+  }
   function api(method, path, body) {
     var opts = { method: method, headers: { "X-Admin-Token": token } };
-    if (body) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
-    return fetch(path, opts).then(function (r) {
+    if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+    return fetch("/v1" + path, opts).then(function (r) {
       if (r.status === 204) return null;
       return r.text().then(function (txt) {
-        var data = null;
-        try { data = txt ? JSON.parse(txt) : null; } catch (e) {}
+        var data = null; try { data = txt ? JSON.parse(txt) : null; } catch (e) {}
         if (!r.ok) { var err = new Error((data && data.message) || ("Erreur " + r.status)); err.status = r.status; throw err; }
         return data;
       });
     });
   }
-
-  function show(loggedIn) {
-    $("login").classList.toggle("hidden", loggedIn);
-    $("app").classList.toggle("hidden", !loggedIn);
-    $("logout").classList.toggle("hidden", !loggedIn);
+  function fail(er) { toast(er.message, true); }
+  function money(cents, cur) {
+    var v = (cents / 100).toFixed(2).replace(".", ",");
+    return v + " " + ({ USD: "$", EUR: "€", CDF: "FC" }[cur] || cur);
   }
+  function pill(text, cls) { return h("span", { "class": "pill " + (cls || ""), text: text }); }
+  function when(iso) { return iso ? iso.slice(0, 16).replace("T", " ") : ""; }
 
-  function pill(text, cls) {
-    var s = document.createElement("span");
-    s.className = "pill " + (cls || "");
-    s.textContent = text;
-    return s;
-  }
-
-  function renderStats(s) {
-    var box = $("stats");
-    box.textContent = "";
-    [["Joueurs", s.users], ["Jeux", s.games], ["Sessions actives", s.activeSessions]].forEach(function (p) {
-      var d = document.createElement("div"); d.className = "stat";
-      var b = document.createElement("b"); b.textContent = String(p[1]);
-      var l = document.createElement("span"); l.className = "muted"; l.textContent = p[0];
-      d.appendChild(b); d.appendChild(l); box.appendChild(d);
-    });
-  }
-
-  function renderList(items) {
-    var list = $("list");
-    list.textContent = "";
-    if (!items.length) {
-      var e = document.createElement("div"); e.className = "card muted";
-      e.textContent = "Aucun jeu pour le moment. Touche « + Nouveau jeu » pour publier le premier.";
-      list.appendChild(e); return;
-    }
-    items.forEach(function (g) {
-      var c = document.createElement("div"); c.className = "card game";
-      var left = document.createElement("div");
-      var b = document.createElement("b"); b.textContent = g.title;
-      left.appendChild(b);
-      left.appendChild(pill(g.published ? "publié" : "masqué", g.published ? "on" : "off"));
-      if (g.featured) left.appendChild(pill("à la une", "on"));
-      var m = document.createElement("div"); m.className = "muted";
-      m.textContent = g.id + " · v" + g.versionName + " · " + g.category + " · " + g.sizeMb + " Mo · " + (g.priceCents === null ? "code seulement" : g.priceCents === 0 ? "gratuit" : (g.priceCents / 100).toFixed(2) + " " + g.currency) + (g.packUrl ? " · paquet ok" : " · sans paquet");
-      left.appendChild(m);
-      var right = document.createElement("div"); right.className = "row";
-      var edit = document.createElement("button"); edit.className = "secondary"; edit.textContent = "Modifier";
-      edit.onclick = function () { openForm(g); };
-      var del = document.createElement("button"); del.className = "danger"; del.textContent = "Supprimer";
-      del.onclick = function () {
-        if (!confirm("Supprimer définitivement « " + g.title + " » ?")) return;
-        api("DELETE", "/v1/admin/games/" + encodeURIComponent(g.id)).then(function () { toast("Jeu supprimé."); load(); })
-          .catch(function (er) { toast(er.message, true); });
+  /* ---------- Fenêtre de formulaire ---------- */
+  function ask(title, fields, okText, intro) {
+    return new Promise(function (resolve) {
+      var dlg = $("dlg"), form = $("dlgForm"), inputs = {}, done = false;
+      form.textContent = "";
+      form.appendChild(h("h3", { text: title }));
+      if (intro) form.appendChild(h("div", { "class": "muted", text: intro }));
+      var grid = null;
+      fields.forEach(function (f) {
+        var box = h("div", { "class": "field" });
+        var input;
+        if (f.type === "check") {
+          input = h("input", { type: "checkbox", id: "ff_" + f.name }); input.checked = !!f.value;
+          box = h("label", { "class": "check" }, [input, f.label]);
+        } else {
+          box.appendChild(h("label", { "for": "ff_" + f.name, text: f.label }));
+          if (f.type === "textarea") input = h("textarea", { id: "ff_" + f.name });
+          else if (f.type === "select") {
+            input = h("select", { id: "ff_" + f.name });
+            f.options.forEach(function (o) { input.appendChild(h("option", { value: o[0], text: o[1] })); });
+          } else if (f.type === "file") {
+            input = h("input", { type: "file", id: "ff_" + f.name });
+            input.onchange = function () { fileHash(input.files[0], inputs, f); };
+          } else input = h("input", { id: "ff_" + f.name, type: f.type || "text" });
+          if (f.type !== "file") input.value = f.value == null ? "" : f.value;
+          if (f.readonly) input.readOnly = true;
+          if (f.placeholder) input.placeholder = f.placeholder;
+          if (f.step) input.step = f.step;
+          box.appendChild(input);
+          if (f.hint) box.appendChild(h("div", { "class": "hint", id: "hint_" + f.name, text: f.hint }));
+        }
+        inputs[f.name] = input;
+        if (f.half) {
+          if (!grid || grid.children.length >= 2) { grid = h("div", { "class": "two" }); form.appendChild(grid); }
+          grid.appendChild(box);
+        } else { grid = null; form.appendChild(box); }
+      });
+      var ok = h("button", { "class": "btn", type: "submit", text: okText || "Enregistrer" });
+      var cancel = h("button", { "class": "btn ghost", type: "button", text: "Annuler" });
+      form.appendChild(h("div", { "class": "actions" }, [cancel, ok]));
+      function finish(v) { if (done) return; done = true; if (dlg.open) dlg.close(); resolve(v); }
+      cancel.onclick = function () { finish(null); };
+      dlg.oncancel = function () { finish(null); };
+      form.onsubmit = function (ev) {
+        ev.preventDefault();
+        var out = {};
+        fields.forEach(function (f) { if (f.type === "file") return; var i = inputs[f.name]; out[f.name] = f.type === "check" ? i.checked : i.value; });
+        finish(out);
       };
-      var codes = document.createElement("button"); codes.className = "secondary"; codes.textContent = "Codes";
-      codes.onclick = function () { makeCodes(g); };
-      right.appendChild(edit); right.appendChild(codes); right.appendChild(del);
-      c.appendChild(left); c.appendChild(right); list.appendChild(c);
+      dlg.showModal();
     });
   }
-
-  function renderOrders(items) {
-    var box = $("orders");
-    box.textContent = "";
-    if (!items.length) {
-      var e = document.createElement("div"); e.className = "card muted"; e.textContent = "Aucune commande pour le moment.";
-      box.appendChild(e); return;
-    }
-    items.forEach(function (it) {
-      var o = it.order;
-      var c = document.createElement("div"); c.className = "card game";
-      var left = document.createElement("div");
-      var b = document.createElement("b"); b.textContent = o.gameTitle;
-      left.appendChild(b);
-      left.appendChild(pill(o.status, o.status === "paid" ? "on" : (o.status === "pending" ? "" : "off")));
-      if (o.sandbox) left.appendChild(pill("test"));
-      var m = document.createElement("div"); m.className = "muted";
-      m.textContent = (it.userName || "compte supprimé") + " · " + (o.amountCents / 100).toFixed(2) + " " + o.currency + " · " + o.createdAt.slice(0, 16).replace("T", " ");
-      left.appendChild(m);
-      c.appendChild(left);
-      if (o.status === "pending" && o.sandbox) {
-        var right = document.createElement("div"); right.className = "row";
-        var ok = document.createElement("button"); ok.textContent = "Simuler : payé";
-        ok.onclick = function () { api("POST", "/v1/admin/orders/" + o.id + "/sandbox-confirm").then(function () { toast("Paiement de test confirmé : le jeu est dans la bibliothèque du joueur."); load(); }).catch(function (er) { toast(er.message, true); }); };
-        var ko = document.createElement("button"); ko.className = "secondary"; ko.textContent = "Simuler : échec";
-        ko.onclick = function () { api("POST", "/v1/admin/orders/" + o.id + "/sandbox-fail").then(function () { load(); }).catch(function (er) { toast(er.message, true); }); };
-        right.appendChild(ok); right.appendChild(ko); c.appendChild(right);
-      }
-      box.appendChild(c);
-    });
+  function fileHash(file, inputs, f) {
+    if (!file) return;
+    var hint = $("hint_" + f.name);
+    if (hint) hint.textContent = "Calcul de l'empreinte… un gros fichier peut prendre un moment.";
+    file.arrayBuffer().then(function (buf) { return crypto.subtle.digest("SHA-256", buf); }).then(function (d) {
+      var hex = Array.prototype.map.call(new Uint8Array(d), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+      if (inputs[f.fillSha]) inputs[f.fillSha].value = hex;
+      if (inputs[f.fillSize]) inputs[f.fillSize].value = Math.max(1, Math.round(file.size / 1048576));
+      if (hint) hint.textContent = "Taille et empreinte remplies à partir de « " + file.name + " ».";
+    }).catch(function () { if (hint) hint.textContent = "Fichier trop gros pour ce navigateur : colle l'empreinte à la main."; });
+  }
+  function showSecret(title, text, note) {
+    var dlg = $("dlg"), form = $("dlgForm");
+    form.textContent = "";
+    form.appendChild(h("h3", { text: title }));
+    form.appendChild(h("pre", { "class": "secret", text: text }));
+    if (note) form.appendChild(h("div", { "class": "muted", text: note }));
+    var copy = h("button", { "class": "btn", type: "button", text: "Copier" });
+    copy.onclick = function () { try { navigator.clipboard.writeText(text).then(function () { toast("Copié."); }); } catch (e) { toast("Sélectionne le texte et copie-le.", true); } };
+    var close = h("button", { "class": "btn ghost", type: "submit", text: "Fermer" });
+    form.appendChild(h("div", { "class": "actions" }, [copy, close]));
+    form.onsubmit = function () { dlg.close(); };
+    dlg.oncancel = null;
+    dlg.showModal();
   }
 
+  /* ---------- Données ---------- */
   function load() {
-    return Promise.all([api("GET", "/v1/admin/games"), api("GET", "/v1/admin/stats"), api("GET", "/v1/admin/orders")]).then(function (res) {
-      renderList(res[0].items); renderStats(res[1]); renderOrders(res[2].items); show(true);
+    return Promise.all([api("GET", "/admin/games"), api("GET", "/admin/stats"), api("GET", "/admin/orders"),
+      api("GET", "/admin/reviews"), api("GET", "/admin/publishers"), api("GET", "/admin/partners")]).then(function (r) {
+      state.games = r[0].items; state.stats = r[1]; state.orders = r[2].items; state.reviews = r[3].items;
+      state.publishers = r[4].items; state.partners = r[5].items;
+      $("login").classList.add("hidden"); $("app").classList.remove("hidden");
+      render();
     }).catch(function (er) {
-      if (er.status === 401 || er.status === 404) { show(false); try { sessionStorage.removeItem("hz_admin"); } catch (e) {} }
-      toast(er.message, true);
+      if (er.status === 401 || er.status === 404) { token = ""; try { sessionStorage.removeItem("hz_admin"); } catch (e) {} $("login").classList.remove("hidden"); $("app").classList.add("hidden"); }
+      fail(er);
+    });
+  }
+  function act(promise, okMsg) { return promise.then(function () { if (okMsg) toast(okMsg); return load(); }).catch(fail); }
+
+  /* ---------- Navigation ---------- */
+  var toValidate = function () { return state.publishers.filter(function (p) { return p.publisher.status === "signed"; }).length; };
+  var tabs = [
+    ["home", "Vue d'ensemble", function () { return 0; }],
+    ["reviews", "Jeux à valider", function () { return state.reviews.length; }],
+    ["publishers", "Éditeurs", toValidate],
+    ["games", "Catalogue", function () { return 0; }],
+    ["orders", "Commandes", function () { return state.orders.filter(function (o) { return o.order.status === "pending"; }).length; }],
+    ["integrations", "Clés partenaires", function () { return 0; }]
+  ];
+  function renderNav() {
+    var nav = $("nav"); nav.textContent = "";
+    tabs.forEach(function (t) {
+      var n = t[2]();
+      var b = h("button", { type: "button", onclick: function () { state.tab = t[0]; render(); window.scrollTo(0, 0); } }, [t[1], n ? h("span", { "class": "badge", text: String(n) }) : null]);
+      if (state.tab === t[0]) b.setAttribute("aria-current", "page");
+      nav.appendChild(b);
+    });
+  }
+  function render() {
+    renderNav();
+    var main = $("main"); main.textContent = "";
+    ({ home: pageHome, reviews: pageReviews, publishers: pagePublishers, games: pageGames, orders: pageOrders, integrations: pageIntegrations })[state.tab](main);
+  }
+  function head(main, title, actions) {
+    main.appendChild(h("div", { "class": "page-head" }, [h("h2", { text: title }), h("div", { "class": "row" }, actions || [])]));
+  }
+  function list(main, items, empty, build) {
+    var box = h("div", { "class": "list" });
+    if (!items.length) box.appendChild(h("div", { "class": "empty", text: empty }));
+    items.forEach(function (it) { box.appendChild(build(it)); });
+    main.appendChild(box);
+  }
+
+  /* ---------- Vue d'ensemble ---------- */
+  function pageHome(main) {
+    head(main, "Vue d'ensemble", [h("button", { "class": "btn ghost sm", text: "Actualiser", onclick: load })]);
+    var s = state.stats;
+    var fig = h("div", { "class": "figures" });
+    [["Joueurs", s.users], ["Jeux au catalogue", s.games], ["Sessions actives", s.activeSessions], ["Éditeurs", state.publishers.length]].forEach(function (f) {
+      fig.appendChild(h("div", { "class": "figure" }, [h("b", { "class": "num", text: String(f[1]) }), h("span", { text: f[0] })]));
+    });
+    main.appendChild(fig);
+    main.appendChild(h("h3", { text: "À faire", style: "margin-bottom:12px" }));
+    var todos = [];
+    state.publishers.forEach(function (p) {
+      if (p.publisher.status === "registered") todos.push(["Nouvel éditeur : " + p.publisher.companyName + ". Fixe sa commission pour qu'il puisse signer.", "publishers"]);
+      if (p.publisher.status === "signed") todos.push([p.publisher.companyName + " a signé le contrat. À valider.", "publishers"]);
+    });
+    state.reviews.forEach(function (r) { todos.push(["« " + r.game.title + " » (" + (r.publisherName || "—") + ") attend ta validation.", "reviews"]); });
+    var pend = state.orders.filter(function (o) { return o.order.status === "pending"; }).length;
+    if (pend) todos.push([pend + " commande(s) en attente de paiement.", "orders"]);
+    if (!todos.length) main.appendChild(h("div", { "class": "list" }, [h("div", { "class": "empty", text: "Rien à traiter pour le moment." })]));
+    todos.forEach(function (t) {
+      main.appendChild(h("div", { "class": "todo" }, [h("span", { text: t[0] }), h("button", { "class": "btn sm ghost", text: "Ouvrir", onclick: function () { state.tab = t[1]; render(); } })]));
     });
   }
 
-  function openForm(g) {
-    editing = g ? g.id : null;
-    $("formTitle").textContent = g ? "Modifier « " + g.title + " »" : "Nouveau jeu";
-    var v = g || { id: "", title: "", publisher: "", category: "ACTION", description: "", ageRating: "12+", sizeMb: 0, compatibility: "DECLARED", packageName: "", packUrl: "", packSha256: "", versionCode: 1, versionName: "1.0", engine: "", engineVersion: "", priceCents: null, currency: "USD", featured: false, published: true };
-    $("f_id").value = v.id; $("f_id").readOnly = !!g;
-    $("f_title").value = v.title; $("f_publisher").value = v.publisher; $("f_category").value = v.category;
-    $("f_age").value = v.ageRating; $("f_compat").value = v.compatibility; $("f_size").value = v.sizeMb;
-    $("f_pkg").value = v.packageName || ""; $("f_desc").value = v.description;
-    $("f_url").value = v.packUrl || ""; $("f_sha").value = v.packSha256 || "";
-    $("f_ver").value = v.versionCode || 1; $("f_vername").value = v.versionName || "1.0";
-    $("f_engine").value = v.engine || ""; $("f_engver").value = v.engineVersion || "";
-    $("f_price").value = (v.priceCents === null || v.priceCents === undefined) ? "" : (v.priceCents / 100).toFixed(2);
-    $("f_cur").value = v.currency || "USD";
-    $("f_featured").checked = !!v.featured; $("f_published").checked = v.published !== false;
-    $("fileInfo").textContent = "";
-    $("form").classList.remove("hidden");
-    $("form").scrollIntoView({ behavior: "smooth" });
+  /* ---------- Jeux à valider ---------- */
+  function pageReviews(main) {
+    head(main, "Jeux à valider");
+    list(main, state.reviews, "Aucun jeu en attente.", function (r) {
+      var g = r.game;
+      var price = g.priceCents == null ? "pas en vente" : money(g.priceCents, g.currency);
+      var left = h("div", {}, [
+        h("div", { "class": "t" }, [g.title, pill(r.publisherName || "sans éditeur", "info")]),
+        h("div", { "class": "s", text: g.category + ", " + g.ageRating + ", " + g.sizeMb + " Mo, " + price + ", version " + g.versionName }),
+        h("div", { "class": "s", text: g.description.slice(0, 220) }),
+        h("div", { "class": "s", text: "Fichier : " + (g.packUrl || "aucun") }),
+        h("div", { "class": "s", text: "SHA-256 : " + (g.packSha256 || "aucune") })
+      ]);
+      var right = h("div", { "class": "row" }, [
+        h("button", { "class": "btn sm", text: "Approuver et publier", onclick: function () {
+          if (!confirm("Publier « " + g.title + " » dans le Store ?")) return;
+          act(api("POST", "/admin/games/" + g.id + "/review", { approve: true }), "Jeu publié.");
+        } }),
+        h("button", { "class": "btn sm danger", text: "Refuser", onclick: function () {
+          ask("Refuser « " + g.title + " »", [{ name: "note", label: "Motif (l'éditeur le verra)", type: "textarea" }], "Refuser").then(function (v) {
+            if (v) act(api("POST", "/admin/games/" + g.id + "/review", { approve: false, note: v.note }), "Jeu refusé.");
+          });
+        } })
+      ]);
+      return h("div", { "class": "item" }, [left, right]);
+    });
   }
 
+  /* ---------- Éditeurs ---------- */
+  var statusLabel = { registered: ["Inscrit", "wait"], contract_ready: ["Contrat à signer", "wait"], signed: ["Signé, à valider", "info"], active: ["Actif", "ok"], suspended: ["Suspendu", "bad"] };
+  function pagePublishers(main) {
+    head(main, "Éditeurs");
+    list(main, state.publishers, "Aucun éditeur inscrit. Ils s'inscrivent eux-mêmes sur la page /portal.", function (it) {
+      var p = it.publisher, st = statusLabel[p.status] || [p.status, ""];
+      var left = h("div", {}, [
+        h("div", { "class": "t" }, [p.companyName, pill(st[0], st[1])]),
+        h("div", { "class": "s", text: p.contactName + ", " + p.email + ", " + p.country + (p.phone ? ", " + p.phone : "") }),
+        h("div", { "class": "s", text: "Commission : " + (p.commissionPercent == null ? "non fixée" : p.commissionPercent + " %") + ". Jeux : " + it.games + ". Codes créés : " + it.codesCreated + ", utilisés : " + it.codesRedeemed + "." + (p.signedAt ? " Signé par " + p.signedName + " le " + when(p.signedAt) + "." : "") })
+      ]);
+      var right = h("div", { "class": "row" });
+      function offer() {
+        ask("Commission de " + p.companyName, [{ name: "pct", label: "Part retenue par HORIZON (en %)", type: "number", step: "0.5", value: p.commissionPercent == null ? 30 : p.commissionPercent, hint: "L'éditeur recevra le reste. Ce taux est écrit dans son contrat." }], "Envoyer le contrat",
+          "L'éditeur pourra ensuite lire et signer son contrat sur le portail.").then(function (v) {
+          if (v) act(api("POST", "/admin/publishers/" + p.id + "/contract-offer", { commissionPercent: parseFloat(String(v.pct).replace(",", ".")) }), "Contrat prêt à signer.");
+        });
+      }
+      if (p.status === "registered") right.appendChild(h("button", { "class": "btn sm", text: "Fixer la commission", onclick: offer }));
+      if (p.status === "contract_ready") right.appendChild(h("button", { "class": "btn sm ghost", text: "Changer la commission", onclick: offer }));
+      if (p.status === "signed") right.appendChild(h("button", { "class": "btn sm", text: "Valider le contrat", onclick: function () {
+        ask("Valider le contrat de " + p.companyName, [{ name: "note", label: "Note interne (facultatif)", placeholder: "ex. pièce d'identité vérifiée" }], "Valider").then(function (v) {
+          if (v) act(api("POST", "/admin/publishers/" + p.id + "/validate", { note: v.note || null }), "Contrat validé : l'éditeur peut publier.");
+        });
+      } }));
+      if (p.status === "active" || p.status === "suspended") right.appendChild(h("button", { "class": "btn sm ghost", text: "Ventes et reversements", onclick: function () { salesDialog(p); } }));
+      if (p.status === "active") right.appendChild(h("button", { "class": "btn sm danger", text: "Suspendre", onclick: function () { if (confirm("Suspendre " + p.companyName + " ?")) act(api("POST", "/admin/publishers/" + p.id + "/suspend", {}), "Compte suspendu."); } }));
+      if (p.status === "suspended") right.appendChild(h("button", { "class": "btn sm", text: "Réactiver", onclick: function () { act(api("POST", "/admin/publishers/" + p.id + "/reinstate", {}), "Compte réactivé."); } }));
+      return h("div", { "class": "item" }, [left, right]);
+    });
+  }
+  function salesDialog(p) {
+    api("GET", "/admin/publishers/" + p.id + "/sales").then(function (s) {
+      var dlg = $("dlg"), form = $("dlgForm");
+      form.textContent = "";
+      form.appendChild(h("h3", { text: "Ventes de " + p.companyName }));
+      var tb = h("table", {}, [h("tr", {}, ["Devise", "Encaissé", "Commission", "Part éditeur", "Déjà reversé", "Reste à reverser"].map(function (x, i) { return h("th", { "class": i ? "r" : "", text: x }); }))]);
+      if (!s.balances.length) tb.appendChild(h("tr", {}, [h("td", { colspan: "6", "class": "muted", text: "Aucune vente réelle pour le moment." })]));
+      s.balances.forEach(function (b) {
+        tb.appendChild(h("tr", {}, [h("td", { text: b.currency }), h("td", { "class": "r num", text: money(b.grossCents, b.currency) }), h("td", { "class": "r num", text: money(b.commissionCents, b.currency) }),
+          h("td", { "class": "r num", text: money(b.dueCents, b.currency) }), h("td", { "class": "r num", text: money(b.paidCents, b.currency) }), h("td", { "class": "r num", text: money(b.balanceCents, b.currency) })]));
+      });
+      form.appendChild(tb);
+      var tests = s.lines.filter(function (l) { return l.test; }).reduce(function (n, l) { return n + l.orders; }, 0);
+      if (tests) form.appendChild(h("div", { "class": "muted", text: tests + " vente(s) de test ne sont pas comptées." }));
+      if (s.payouts.length) {
+        form.appendChild(h("h3", { text: "Reversements enregistrés", style: "font-size:16px;margin-top:8px" }));
+        s.payouts.forEach(function (x) { form.appendChild(h("div", { "class": "muted", text: when(x.createdAt) + ", " + money(x.amountCents, x.currency) + (x.note ? ", " + x.note : "") })); });
+      }
+      var add = h("button", { "class": "btn", type: "button", text: "Enregistrer un reversement" });
+      add.onclick = function () {
+        dlg.close();
+        ask("Reversement à " + p.companyName, [
+          { name: "amount", label: "Montant versé", type: "number", step: "0.01", half: true },
+          { name: "cur", label: "Devise", type: "select", options: [["USD", "USD"], ["EUR", "EUR"], ["CDF", "CDF"]], half: true },
+          { name: "note", label: "Note (moyen de paiement, référence)" }
+        ], "Enregistrer", "À n'enregistrer qu'après avoir réellement envoyé l'argent.").then(function (v) {
+          if (!v) return;
+          var cents = Math.round(parseFloat(String(v.amount).replace(",", ".")) * 100);
+          if (!(cents > 0)) return toast("Montant invalide.", true);
+          act(api("POST", "/admin/publishers/" + p.id + "/payouts", { amountCents: cents, currency: v.cur, note: v.note || null }), "Reversement enregistré.");
+        });
+      };
+      var close = h("button", { "class": "btn ghost", type: "submit", text: "Fermer" });
+      form.appendChild(h("div", { "class": "actions" }, [add, close]));
+      form.onsubmit = function () { dlg.close(); };
+      dlg.showModal();
+    }).catch(fail);
+  }
+
+  /* ---------- Catalogue ---------- */
+  var cats = [["ACTION", "Action"], ["RACING", "Course"], ["PUZZLE", "Puzzle"], ["ADVENTURE", "Aventure"], ["STRATEGY", "Stratégie"]];
+  function gameForm(g) {
+    var v = g || { id: "", title: "", publisher: "", category: "ACTION", description: "", ageRating: "12+", sizeMb: 0, compatibility: "DECLARED", packageName: "", packUrl: "", packSha256: "", versionCode: 1, versionName: "1.0", engine: "godot", engineVersion: "", priceCents: null, currency: "USD", featured: false, published: true };
+    ask(g ? "Modifier « " + g.title + " »" : "Nouveau jeu", [
+      { name: "id", label: "Identifiant (minuscules, chiffres, tirets)", value: v.id, readonly: !!g, half: true },
+      { name: "title", label: "Titre", value: v.title, half: true },
+      { name: "publisher", label: "Éditeur", value: v.publisher, half: true },
+      { name: "category", label: "Catégorie", type: "select", options: cats, value: v.category, half: true },
+      { name: "price", label: "Prix (vide = pas en vente, 0 = gratuit)", value: v.priceCents == null ? "" : (v.priceCents / 100).toFixed(2), half: true },
+      { name: "currency", label: "Devise", type: "select", options: [["USD", "USD ($)"], ["EUR", "EUR (€)"], ["CDF", "CDF (FC)"]], value: v.currency, half: true },
+      { name: "ageRating", label: "Âge conseillé", value: v.ageRating, half: true },
+      { name: "packageName", label: "Nom de paquet Android", value: v.packageName || "", half: true },
+      { name: "description", label: "Description", type: "textarea", value: v.description },
+      { name: "file", label: "Calculer l'empreinte à partir d'un fichier de cet appareil", type: "file", fillSha: "packSha256", fillSize: "sizeMb", hint: "Remplit la taille et l'empreinte SHA-256." },
+      { name: "packUrl", label: "Adresse du fichier de jeu (https://…)", value: v.packUrl || "" },
+      { name: "packSha256", label: "Empreinte SHA-256 (obligatoire avec l'adresse)", value: v.packSha256 || "" },
+      { name: "sizeMb", label: "Taille (Mo)", type: "number", value: v.sizeMb, half: true },
+      { name: "versionCode", label: "Numéro de version (+1 à chaque mise à jour)", type: "number", value: v.versionCode, half: true },
+      { name: "versionName", label: "Nom de version", value: v.versionName, half: true },
+      { name: "engine", label: "Moteur (ex. godot)", value: v.engine || "", half: true },
+      { name: "engineVersion", label: "Version du moteur", value: v.engineVersion || "", half: true },
+      { name: "compatibility", label: "Compatibilité", type: "select", options: [["VERIFIED", "Vérifiée"], ["DECLARED", "Déclarée"], ["UNKNOWN", "Inconnue"]], value: v.compatibility },
+      { name: "featured", label: "Mis à la une", type: "check", value: v.featured },
+      { name: "published", label: "Publié (visible dans le Store)", type: "check", value: v.published }
+    ], "Enregistrer").then(function (f) {
+      if (!f) return;
+      var price = String(f.price).trim();
+      var body = {
+        id: f.id.trim(), title: f.title.trim(), publisher: f.publisher.trim(), category: f.category, description: f.description,
+        ageRating: f.ageRating.trim() || "12+", sizeMb: parseInt(f.sizeMb, 10) || 0, compatibility: f.compatibility,
+        packageName: f.packageName.trim() || null, packUrl: f.packUrl.trim() || null, packSha256: f.packSha256.trim() || null,
+        versionCode: parseInt(f.versionCode, 10) || 1, versionName: f.versionName.trim() || "1.0",
+        engine: f.engine.trim() || null, engineVersion: f.engineVersion.trim() || null,
+        priceCents: price === "" ? null : Math.round(parseFloat(price.replace(",", ".")) * 100), currency: f.currency,
+        featured: f.featured, published: f.published
+      };
+      act(api("PUT", "/admin/games/" + encodeURIComponent(body.id), body), g ? "Jeu mis à jour." : "Jeu enregistré.");
+    });
+  }
   function makeCodes(g) {
-    api("GET", "/v1/admin/codes/" + encodeURIComponent(g.id)).then(function (st) {
-      var n = prompt("« " + g.title + " » : " + st.total + " codes créés, " + st.redeemed + " utilisés.\nCombien de nouveaux codes générer ? (1 à 200)", "5");
-      if (!n) return null;
-      var count = parseInt(n, 10);
-      if (!(count >= 1 && count <= 200)) { toast("Nombre invalide.", true); return null; }
-      return api("POST", "/v1/admin/codes", { gameId: g.id, count: count });
+    api("GET", "/admin/codes/" + encodeURIComponent(g.id)).then(function (st) {
+      return ask("Codes pour « " + g.title + " »", [{ name: "n", label: "Combien de nouveaux codes ? (1 à 200)", type: "number", value: 5 }], "Générer",
+        st.total + " codes créés, " + st.redeemed + " utilisés.").then(function (v) {
+        if (!v) return null;
+        var n = parseInt(v.n, 10);
+        if (!(n >= 1 && n <= 200)) { toast("Nombre invalide.", true); return null; }
+        return api("POST", "/admin/codes", { gameId: g.id, count: n });
+      });
     }).then(function (res) {
-      if (!res) return;
-      $("codesTitle").textContent = "Codes pour « " + g.title + " »";
-      $("codesText").value = res.codes.join("\n");
-      $("codesBox").classList.remove("hidden");
-      $("codesBox").scrollIntoView({ behavior: "smooth" });
-    }).catch(function (er) { toast(er.message, true); });
+      if (res) showSecret("Codes pour « " + g.title + " »", res.codes.join("\n"), "Ils ne seront plus jamais affichés : copie-les maintenant.");
+    }).catch(fail);
   }
-  $("copyCodes").onclick = function () {
-    var t = $("codesText"); t.select();
-    try { navigator.clipboard.writeText(t.value).then(function () { toast("Codes copiés."); }); } catch (e) { document.execCommand("copy"); toast("Codes copiés."); }
-  };
-  $("closeCodes").onclick = function () { $("codesText").value = ""; $("codesBox").classList.add("hidden"); };
+  function pageGames(main) {
+    head(main, "Catalogue", [h("button", { "class": "btn", text: "Nouveau jeu", onclick: function () { gameForm(null); } })]);
+    list(main, state.games, "Le catalogue est vide. Ajoute ton premier jeu.", function (g) {
+      var price = g.priceCents == null ? "code seulement" : (g.priceCents === 0 ? "gratuit" : money(g.priceCents, g.currency));
+      var left = h("div", {}, [
+        h("div", { "class": "t" }, [g.title, g.published ? pill("publié", "ok") : pill("masqué", "wait"), g.featured ? pill("à la une", "info") : null]),
+        h("div", { "class": "s", text: g.publisher + ", " + price + ", version " + g.versionName + ", " + g.sizeMb + " Mo" })
+      ]);
+      var right = h("div", { "class": "row" }, [
+        h("button", { "class": "btn sm ghost", text: "Modifier", onclick: function () { gameForm(g); } }),
+        h("button", { "class": "btn sm ghost", text: "Codes", onclick: function () { makeCodes(g); } }),
+        h("button", { "class": "btn sm danger", text: "Supprimer", onclick: function () { if (confirm("Supprimer « " + g.title + " » ?")) act(api("DELETE", "/admin/games/" + encodeURIComponent(g.id)), "Jeu supprimé."); } })
+      ]);
+      return h("div", { "class": "item" }, [left, right]);
+    });
+  }
 
+  /* ---------- Commandes ---------- */
+  function pageOrders(main) {
+    head(main, "Commandes", [h("span", { "class": "muted", text: "Paiement de test : aucun argent réel." })]);
+    list(main, state.orders, "Aucune commande pour le moment.", function (it) {
+      var o = it.order, cls = o.status === "paid" ? "ok" : (o.status === "pending" ? "wait" : "bad");
+      var left = h("div", {}, [
+        h("div", { "class": "t" }, [o.gameTitle, pill(o.status, cls), o.sandbox ? pill("test") : null]),
+        h("div", { "class": "s", text: (it.userName || "compte supprimé") + ", " + money(o.amountCents, o.currency) + ", " + when(o.createdAt) })
+      ]);
+      var right = h("div", { "class": "row" });
+      if (o.status === "pending" && o.sandbox) {
+        right.appendChild(h("button", { "class": "btn sm", text: "Simuler : payé", onclick: function () { act(api("POST", "/admin/orders/" + o.id + "/sandbox-confirm", {}), "Paiement de test confirmé."); } }));
+        right.appendChild(h("button", { "class": "btn sm ghost", text: "Simuler : échec", onclick: function () { act(api("POST", "/admin/orders/" + o.id + "/sandbox-fail", {})); } }));
+      }
+      return h("div", { "class": "item" }, [left, right]);
+    });
+  }
+
+  /* ---------- Clés partenaires (API) ---------- */
+  function parseIds(t) { return (t || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean); }
+  function pageIntegrations(main) {
+    head(main, "Clés partenaires", [h("button", { "class": "btn", text: "Nouveau partenaire", onclick: function () {
+      ask("Nouveau partenaire", [
+        { name: "name", label: "Nom (magasin ou éditeur)" },
+        { name: "kind", label: "Type", type: "select", options: [["reseller", "Revendeur (magasin)"], ["publisher", "Éditeur"]] },
+        { name: "games", label: "Jeux autorisés (identifiants séparés par des virgules)" }
+      ], "Créer", "Pour les revendeurs et les intégrations automatiques. Les éditeurs normaux passent par /portal.").then(function (v) {
+        if (!v) return;
+        api("POST", "/admin/partners", { name: v.name, kind: v.kind, gameIds: parseIds(v.games) }).then(function (r) {
+          showSecret("Clé de « " + r.partner.name + " »", r.apiKey, "Cette clé ne sera plus jamais affichée. Donne-la au partenaire de façon sûre.");
+          load();
+        }).catch(fail);
+      });
+    } })]);
+    var portalIds = state.publishers.map(function (x) { return x.publisher.id; });
+    var items = state.partners.filter(function (p) { return portalIds.indexOf(p.id) < 0; });
+    list(main, items, "Aucun partenaire à clé.", function (p) {
+      var left = h("div", {}, [
+        h("div", { "class": "t" }, [p.name, pill(p.kind === "publisher" ? "éditeur" : "revendeur", "info"), pill(p.active ? "actif" : "désactivé", p.active ? "ok" : "bad")]),
+        h("div", { "class": "s", text: "Jeux : " + (p.gameIds.join(", ") || "aucun") + ". Codes créés : " + p.codesCreated + ", utilisés : " + p.codesRedeemed + "." })
+      ]);
+      var right = h("div", { "class": "row" }, [
+        h("button", { "class": "btn sm ghost", text: "Jeux autorisés", onclick: function () {
+          ask("Jeux de " + p.name, [{ name: "g", label: "Identifiants séparés par des virgules", value: p.gameIds.join(", ") }]).then(function (v) { if (v) act(api("PATCH", "/admin/partners/" + p.id, { gameIds: parseIds(v.g) })); });
+        } }),
+        h("button", { "class": "btn sm ghost", text: p.active ? "Désactiver" : "Réactiver", onclick: function () { act(api("PATCH", "/admin/partners/" + p.id, { active: !p.active })); } }),
+        h("button", { "class": "btn sm ghost", text: "Nouvelle clé", onclick: function () {
+          if (!confirm("L'ancienne clé de « " + p.name + " » cessera de fonctionner. Continuer ?")) return;
+          api("POST", "/admin/partners/" + p.id + "/rotate-key", {}).then(function (r) { showSecret("Nouvelle clé de « " + p.name + " »", r.apiKey, "Elle ne sera plus jamais affichée."); }).catch(fail);
+        } })
+      ]);
+      return h("div", { "class": "item" }, [left, right]);
+    });
+  }
+
+  /* ---------- Connexion ---------- */
   $("loginBtn").onclick = function () {
-    token = $("token").value.trim();
-    if (!token) return;
-    try { sessionStorage.setItem("hz_admin", token); } catch (e) {}
-    $("token").value = "";
-    load();
+    var v = $("token").value.trim(); if (!v) return;
+    token = v; try { sessionStorage.setItem("hz_admin", v); } catch (e) {}
+    $("token").value = ""; load();
   };
-  $("logout").onclick = function () { token = ""; try { sessionStorage.removeItem("hz_admin"); } catch (e) {} show(false); };
-  $("newGame").onclick = function () { openForm(null); };
-  $("reload").onclick = load;
-  $("cancel").onclick = function () { $("form").classList.add("hidden"); };
-
-  $("f_file").onchange = function () {
-    var f = this.files && this.files[0];
-    if (!f) return;
-    $("f_size").value = Math.max(1, Math.ceil(f.size / 1048576));
-    $("fileInfo").textContent = "Calcul de l'empreinte en cours… (un gros fichier peut prendre un moment)";
-    f.arrayBuffer().then(function (buf) { return crypto.subtle.digest("SHA-256", buf); }).then(function (h) {
-      var hex = Array.prototype.map.call(new Uint8Array(h), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
-      $("f_sha").value = hex;
-      $("fileInfo").textContent = "Taille et empreinte remplies à partir de « " + f.name + " ».";
-    }).catch(function () { $("fileInfo").textContent = "Impossible de calculer l'empreinte ici (fichier trop gros). Colle-la à la main."; });
-  };
-
-  $("form").onsubmit = function (ev) {
-    ev.preventDefault();
-    var id = $("f_id").value.trim();
-    var body = {
-      id: id, title: $("f_title").value.trim(), publisher: $("f_publisher").value.trim(),
-      category: $("f_category").value, description: $("f_desc").value,
-      ageRating: $("f_age").value.trim() || "12+", sizeMb: parseInt($("f_size").value, 10) || 0,
-      compatibility: $("f_compat").value,
-      packageName: $("f_pkg").value.trim() || null,
-      packUrl: $("f_url").value.trim() || null, packSha256: $("f_sha").value.trim() || null,
-      versionCode: parseInt($("f_ver").value, 10) || 1, versionName: $("f_vername").value.trim() || "1.0",
-      engine: $("f_engine").value.trim() || null, engineVersion: $("f_engver").value.trim() || null,
-      priceCents: $("f_price").value.trim() === "" ? null : Math.round(parseFloat($("f_price").value.replace(",", ".")) * 100),
-      currency: $("f_cur").value,
-      featured: $("f_featured").checked, published: $("f_published").checked
-    };
-    $("saveBtn").disabled = true;
-    api("PUT", "/v1/admin/games/" + encodeURIComponent(id), body).then(function () {
-      toast(editing ? "Jeu mis à jour." : "Jeu publié.");
-      $("form").classList.add("hidden"); load();
-    }).catch(function (er) { toast(er.message, true); }).then(function () { $("saveBtn").disabled = false; });
-  };
-
-  if (token) load(); else show(false);
+  $("token").onkeydown = function (e) { if (e.key === "Enter") $("loginBtn").click(); };
+  $("logout").onclick = function () { token = ""; try { sessionStorage.removeItem("hz_admin"); } catch (e) {} $("app").classList.add("hidden"); $("login").classList.remove("hidden"); };
+  if (token) load();
 })();
 </script>
 </body>

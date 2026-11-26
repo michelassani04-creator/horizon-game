@@ -342,6 +342,259 @@ class Store(private val ds: DataSource) {
         }
     }
 
+    // ---------- Éditeurs (portail) ----------
+
+    private val pubCols =
+        "id,email,name,contact_name,phone,country,status,commission_bp,contract_version,contract_signed_name," +
+            "contract_signed_at,contract_validated_at,created_at"
+
+    private fun ResultSet.toPublisher() = PublisherDto(
+        id = getObject("id", UUID::class.java).toString(),
+        email = getString("email"),
+        companyName = getString("name"),
+        contactName = getString("contact_name") ?: "",
+        phone = getString("phone"),
+        country = getString("country") ?: "",
+        status = getString("status"),
+        commissionPercent = getInt("commission_bp").let { if (wasNull()) null else it / 100.0 },
+        contractVersion = getString("contract_version"),
+        signedName = getString("contract_signed_name"),
+        signedAt = getTimestamp("contract_signed_at")?.toInstant()?.toString(),
+        validatedAt = getTimestamp("contract_validated_at")?.toInstant()?.toString(),
+        createdAt = getTimestamp("created_at").toInstant().toString()
+    )
+
+    /** Lève SQLException (état 23505) si l'e-mail existe déjà. */
+    fun createPublisher(
+        email: String, passwordHash: String, company: String, contact: String, phone: String?, country: String
+    ): UUID = withConn { c ->
+        val id = UUID.randomUUID()
+        c.prepareStatement(
+            "INSERT INTO partners (id,name,kind,key_hash,active,email,password_hash,contact_name,phone,country,status) " +
+                "VALUES (?,?,'publisher',NULL,TRUE,?,?,?,?,?,'registered')"
+        ).use { ps ->
+            ps.setObject(1, id); ps.setString(2, company); ps.setString(3, email); ps.setString(4, passwordHash)
+            ps.setString(5, contact); ps.setString(6, phone); ps.setString(7, country)
+            ps.executeUpdate()
+        }
+        id
+    }
+
+    fun findPublisherLogin(email: String): Pair<PublisherDto, String>? = withConn { c ->
+        c.prepareStatement("SELECT $pubCols, password_hash FROM partners WHERE lower(email) = ?").use { ps ->
+            ps.setString(1, email)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.toPublisher() to (rs.getString("password_hash") ?: "") else null }
+        }
+    }
+
+    fun findPublisher(id: UUID): PublisherDto? = withConn { c ->
+        c.prepareStatement("SELECT $pubCols FROM partners WHERE id = ? AND email IS NOT NULL").use { ps ->
+            ps.setObject(1, id)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.toPublisher() else null }
+        }
+    }
+
+    fun createPublisherSession(partnerId: UUID, tokenHash: String, expiresAt: Instant) = withConn { c ->
+        c.prepareStatement("INSERT INTO publisher_sessions (token_hash,partner_id,expires_at) VALUES (?,?,?)").use { ps ->
+            ps.setString(1, tokenHash); ps.setObject(2, partnerId); ps.setTimestamp(3, Timestamp.from(expiresAt))
+            ps.executeUpdate()
+        }
+    }
+
+    fun findPublisherBySession(tokenHash: String): PublisherDto? = withConn { c ->
+        c.prepareStatement(
+            "SELECT $pubCols FROM partners WHERE email IS NOT NULL AND id = " +
+                "(SELECT partner_id FROM publisher_sessions WHERE token_hash = ? AND expires_at > now())"
+        ).use { ps ->
+            ps.setString(1, tokenHash)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.toPublisher() else null }
+        }
+    }
+
+    fun deletePublisherSession(tokenHash: String) = withConn { c ->
+        c.prepareStatement("DELETE FROM publisher_sessions WHERE token_hash = ?").use { ps ->
+            ps.setString(1, tokenHash); ps.executeUpdate()
+        }
+    }
+
+    private fun updateOne(sql: String, bind: (java.sql.PreparedStatement) -> Unit): Boolean = withConn { c ->
+        c.prepareStatement(sql).use { ps -> bind(ps); ps.executeUpdate() > 0 }
+    }
+
+    /** L'administrateur fixe la commission : l'éditeur peut alors lire et signer le contrat. */
+    fun offerContract(id: UUID, commissionBp: Int): Boolean = updateOne(
+        "UPDATE partners SET commission_bp = ?, status = 'contract_ready' " +
+            "WHERE id = ? AND email IS NOT NULL AND status IN ('registered','contract_ready')"
+    ) { it.setInt(1, commissionBp); it.setObject(2, id) }
+
+    fun validateContract(id: UUID, note: String?): Boolean = updateOne(
+        "UPDATE partners SET status = 'active', active = TRUE, contract_validated_at = now(), contract_note = ? " +
+            "WHERE id = ? AND email IS NOT NULL AND status = 'signed'"
+    ) { it.setString(1, note?.take(500)); it.setObject(2, id) }
+
+    fun suspendPublisher(id: UUID): Boolean = updateOne(
+        "UPDATE partners SET status = 'suspended', active = FALSE WHERE id = ? AND email IS NOT NULL AND status = 'active'"
+    ) { it.setObject(1, id) }
+
+    fun reinstatePublisher(id: UUID): Boolean = updateOne(
+        "UPDATE partners SET status = 'active', active = TRUE WHERE id = ? AND email IS NOT NULL AND status = 'suspended'"
+    ) { it.setObject(1, id) }
+
+    fun signContract(
+        id: UUID, version: String, text: String, sha256: String, commissionBp: Int,
+        signedName: String, ip: String?, agent: String?
+    ): Boolean = withConn { c ->
+        c.autoCommit = false
+        try {
+            val updated = c.prepareStatement(
+                "UPDATE partners SET status = 'signed', contract_version = ?, contract_signed_name = ?, contract_signed_at = now() " +
+                    "WHERE id = ? AND status = 'contract_ready'"
+            ).use { ps -> ps.setString(1, version); ps.setString(2, signedName); ps.setObject(3, id); ps.executeUpdate() }
+            if (updated == 0) {
+                c.rollback()
+                return@withConn false
+            }
+            c.prepareStatement(
+                "INSERT INTO contract_signatures (id,partner_id,version,text_sha256,contract_text,commission_bp,signed_name,signed_ip,signed_agent) " +
+                    "VALUES (?,?,?,?,?,?,?,?,?)"
+            ).use { ps ->
+                ps.setObject(1, UUID.randomUUID()); ps.setObject(2, id); ps.setString(3, version); ps.setString(4, sha256)
+                ps.setString(5, text); ps.setInt(6, commissionBp); ps.setString(7, signedName)
+                ps.setString(8, ip); ps.setString(9, agent?.take(300))
+                ps.executeUpdate()
+            }
+            c.commit()
+            true
+        } catch (e: Exception) {
+            c.rollback()
+            throw e
+        } finally {
+            c.autoCommit = true
+        }
+    }
+
+    /** Texte exact du contrat signé (le plus récent). */
+    fun signedContractText(id: UUID): String? = withConn { c ->
+        c.prepareStatement("SELECT contract_text FROM contract_signatures WHERE partner_id = ? ORDER BY signed_at DESC LIMIT 1").use { ps ->
+            ps.setObject(1, id)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
+        }
+    }
+
+    fun listPublishers(): List<AdminPublisherDto> = withConn { c ->
+        c.prepareStatement(
+            "SELECT $pubCols, " +
+                "(SELECT count(*) FROM games g WHERE g.partner_id = partners.id) AS gc, " +
+                "(SELECT count(*) FROM redeem_codes r WHERE r.partner_id = partners.id) AS cc, " +
+                "(SELECT count(*) FROM redeem_codes r WHERE r.partner_id = partners.id AND r.redeemed_by IS NOT NULL) AS cr " +
+                "FROM partners WHERE email IS NOT NULL ORDER BY created_at DESC"
+        ).use { ps ->
+            ps.executeQuery().use { rs ->
+                val out = ArrayList<AdminPublisherDto>()
+                while (rs.next()) out.add(AdminPublisherDto(rs.toPublisher(), rs.getInt("gc"), rs.getInt("cc"), rs.getInt("cr")))
+                out
+            }
+        }
+    }
+
+    /** (éditeur propriétaire, statut de validation) d'un jeu, ou null s'il n'existe pas. */
+    fun ownerOfGame(gameId: String): Pair<UUID?, String>? = withConn { c ->
+        c.prepareStatement("SELECT partner_id, review_status FROM games WHERE id = ?").use { ps ->
+            ps.setString(1, gameId)
+            ps.executeQuery().use { rs ->
+                if (rs.next()) (rs.getObject(1) as UUID?) to rs.getString(2) else null
+            }
+        }
+    }
+
+    fun saveGameForPartner(partnerId: UUID, g: GameDto) {
+        upsertGame(g)
+        withConn { c ->
+            c.prepareStatement("UPDATE games SET partner_id = ?, review_status = 'draft', review_note = NULL WHERE id = ?").use { ps ->
+                ps.setObject(1, partnerId); ps.setString(2, g.id); ps.executeUpdate()
+            }
+        }
+    }
+
+    fun listPartnerGames(partnerId: UUID): List<PublisherGameDto> = withConn { c ->
+        c.prepareStatement(
+            "SELECT $GAME_COLS, review_status, review_note, " +
+                "(SELECT count(*) FROM redeem_codes r WHERE r.game_id = games.id AND r.partner_id = games.partner_id) AS cc, " +
+                "(SELECT count(*) FROM redeem_codes r WHERE r.game_id = games.id AND r.partner_id = games.partner_id AND r.redeemed_by IS NOT NULL) AS cr " +
+                "FROM games WHERE partner_id = ? ORDER BY title"
+        ).use { ps ->
+            ps.setObject(1, partnerId)
+            ps.executeQuery().use { rs ->
+                val out = ArrayList<PublisherGameDto>()
+                while (rs.next()) out.add(PublisherGameDto(rs.toGame(), rs.getString("review_status"), rs.getString("review_note"), rs.getInt("cc"), rs.getInt("cr")))
+                out
+            }
+        }
+    }
+
+    fun submitGame(partnerId: UUID, gameId: String): Boolean = updateOne(
+        "UPDATE games SET review_status = 'pending', review_note = NULL " +
+            "WHERE id = ? AND partner_id = ? AND review_status IN ('draft','rejected')"
+    ) { it.setString(1, gameId); it.setObject(2, partnerId) }
+
+    fun reviewGame(gameId: String, approve: Boolean, note: String?): Boolean = updateOne(
+        "UPDATE games SET review_status = ?, review_note = ?, published = ?, updated_at = now() " +
+            "WHERE id = ? AND review_status = 'pending'"
+    ) {
+        it.setString(1, if (approve) "approved" else "rejected")
+        it.setString(2, note?.take(500))
+        it.setBoolean(3, approve)
+        it.setString(4, gameId)
+    }
+
+    fun pendingReviews(): List<AdminReviewItem> = withConn { c ->
+        c.prepareStatement(
+            "SELECT $GAME_COLS, review_status, review_note, (SELECT name FROM partners p WHERE p.id = games.partner_id) AS pname " +
+                "FROM games WHERE review_status = 'pending' ORDER BY updated_at"
+        ).use { ps ->
+            ps.executeQuery().use { rs ->
+                val out = ArrayList<AdminReviewItem>()
+                while (rs.next()) out.add(AdminReviewItem(rs.toGame(), rs.getString("pname"), rs.getString("review_status"), rs.getString("review_note")))
+                out
+            }
+        }
+    }
+
+    fun salesLines(partnerId: UUID): List<SalesLine> = withConn { c ->
+        c.prepareStatement(
+            "SELECT g.id, g.title, o.currency, (o.provider = 'sandbox') AS test, count(*), COALESCE(sum(o.amount_cents),0) " +
+                "FROM orders o JOIN games g ON g.id = o.game_id " +
+                "WHERE g.partner_id = ? AND o.status = 'paid' " +
+                "GROUP BY g.id, g.title, o.currency, (o.provider = 'sandbox') ORDER BY g.title"
+        ).use { ps ->
+            ps.setObject(1, partnerId)
+            ps.executeQuery().use { rs ->
+                val out = ArrayList<SalesLine>()
+                while (rs.next()) out.add(SalesLine(rs.getString(1), rs.getString(2), rs.getString(3), rs.getBoolean(4), rs.getInt(5), rs.getLong(6)))
+                out
+            }
+        }
+    }
+
+    fun payoutsOf(partnerId: UUID): List<PayoutDto> = withConn { c ->
+        c.prepareStatement("SELECT id, amount_cents, currency, note, created_at FROM payouts WHERE partner_id = ? ORDER BY created_at DESC").use { ps ->
+            ps.setObject(1, partnerId)
+            ps.executeQuery().use { rs ->
+                val out = ArrayList<PayoutDto>()
+                while (rs.next()) out.add(PayoutDto(rs.getObject(1).toString(), rs.getLong(2), rs.getString(3), rs.getString(4), rs.getTimestamp(5).toInstant().toString()))
+                out
+            }
+        }
+    }
+
+    fun addPayout(partnerId: UUID, amountCents: Long, currency: String, note: String?) = withConn { c ->
+        c.prepareStatement("INSERT INTO payouts (id,partner_id,amount_cents,currency,note) VALUES (?,?,?,?,?)").use { ps ->
+            ps.setObject(1, UUID.randomUUID()); ps.setObject(2, partnerId); ps.setLong(3, amountCents)
+            ps.setString(4, currency); ps.setString(5, note?.take(300))
+            ps.executeUpdate()
+        }
+    }
+
     // ---------- Favoris ----------
 
     fun favorites(userId: UUID): List<String> = withConn { c ->
@@ -418,6 +671,172 @@ class Store(private val ds: DataSource) {
                 ps.executeBatch()
             }
             c.commit()
+        } catch (e: Exception) {
+            c.rollback()
+            throw e
+        } finally {
+            c.autoCommit = true
+        }
+    }
+
+    // ---------- Partenaires (éditeurs et revendeurs) ----------
+
+    fun createPartner(name: String, kind: String, keyHash: String, gameIds: List<String>): UUID = withConn { c ->
+        val id = UUID.randomUUID()
+        c.autoCommit = false
+        try {
+            c.prepareStatement("INSERT INTO partners (id,name,kind,key_hash) VALUES (?,?,?,?)").use { ps ->
+                ps.setObject(1, id); ps.setString(2, name); ps.setString(3, kind); ps.setString(4, keyHash)
+                ps.executeUpdate()
+            }
+            setPartnerGames(c, id, gameIds)
+            c.commit()
+        } catch (e: Exception) {
+            c.rollback()
+            throw e
+        } finally {
+            c.autoCommit = true
+        }
+        id
+    }
+
+    private fun setPartnerGames(c: Connection, partnerId: UUID, gameIds: List<String>) {
+        c.prepareStatement("DELETE FROM partner_games WHERE partner_id = ?").use { ps ->
+            ps.setObject(1, partnerId); ps.executeUpdate()
+        }
+        c.prepareStatement("INSERT INTO partner_games (partner_id, game_id) VALUES (?,?) ON CONFLICT DO NOTHING").use { ps ->
+            for (g in gameIds.distinct()) { ps.setObject(1, partnerId); ps.setString(2, g); ps.addBatch() }
+            ps.executeBatch()
+        }
+    }
+
+    fun gamesExist(ids: List<String>): Boolean = withConn { c ->
+        c.prepareStatement("SELECT count(*) FROM games WHERE id = ANY(?)").use { ps ->
+            ps.setArray(1, c.createArrayOf("text", ids.distinct().toTypedArray()))
+            ps.executeQuery().use { rs -> rs.next(); rs.getInt(1) == ids.distinct().size }
+        }
+    }
+
+    fun listPartners(): List<PartnerDto> = withConn { c ->
+        val games = HashMap<UUID, MutableList<String>>()
+        c.createStatement().use { st ->
+            st.executeQuery("SELECT partner_id, game_id FROM partner_games ORDER BY game_id").use { rs ->
+                while (rs.next()) games.getOrPut(rs.getObject(1) as UUID) { mutableListOf() }.add(rs.getString(2))
+            }
+        }
+        val out = ArrayList<PartnerDto>()
+        c.createStatement().use { st ->
+            st.executeQuery(
+                "SELECT p.id,p.name,p.kind,p.active,p.created_at, count(r.id), count(r.redeemed_by) " +
+                    "FROM partners p LEFT JOIN redeem_codes r ON r.partner_id = p.id " +
+                    "GROUP BY p.id ORDER BY p.created_at DESC"
+            ).use { rs ->
+                while (rs.next()) {
+                    val id = rs.getObject(1) as UUID
+                    out.add(
+                        PartnerDto(
+                            id.toString(), rs.getString(2), rs.getString(3), rs.getBoolean(4),
+                            games[id] ?: emptyList(), rs.getTimestamp(5).toInstant().toString(),
+                            rs.getInt(6), rs.getInt(7)
+                        )
+                    )
+                }
+            }
+        }
+        out
+    }
+
+    fun getPartner(id: UUID): PartnerDto? = listPartners().firstOrNull { it.id == id.toString() }
+
+    fun updatePartner(id: UUID, active: Boolean?, gameIds: List<String>?): Boolean = withConn { c ->
+        c.autoCommit = false
+        try {
+            var found = true
+            if (active != null) {
+                c.prepareStatement("UPDATE partners SET active = ? WHERE id = ?").use { ps ->
+                    ps.setBoolean(1, active); ps.setObject(2, id)
+                    found = ps.executeUpdate() > 0
+                }
+            } else {
+                c.prepareStatement("SELECT 1 FROM partners WHERE id = ?").use { ps ->
+                    ps.setObject(1, id); ps.executeQuery().use { found = it.next() }
+                }
+            }
+            if (found && gameIds != null) setPartnerGames(c, id, gameIds)
+            c.commit()
+            found
+        } catch (e: Exception) {
+            c.rollback()
+            throw e
+        } finally {
+            c.autoCommit = true
+        }
+    }
+
+    fun rotatePartnerKey(id: UUID, keyHash: String): Boolean = withConn { c ->
+        c.prepareStatement("UPDATE partners SET key_hash = ? WHERE id = ?").use { ps ->
+            ps.setString(1, keyHash); ps.setObject(2, id); ps.executeUpdate() > 0
+        }
+    }
+
+    fun findPartnerByKey(keyHash: String): PartnerRow? = withConn { c ->
+        c.prepareStatement("SELECT id,name,kind,active FROM partners WHERE key_hash = ?").use { ps ->
+            ps.setString(1, keyHash)
+            ps.executeQuery().use { rs ->
+                if (rs.next()) PartnerRow(rs.getObject(1) as UUID, rs.getString(2), rs.getString(3), rs.getBoolean(4)) else null
+            }
+        }
+    }
+
+    fun partnerOwnsGame(partnerId: UUID, gameId: String): Boolean = withConn { c ->
+        c.prepareStatement("SELECT 1 FROM partner_games WHERE partner_id = ? AND game_id = ?").use { ps ->
+            ps.setObject(1, partnerId); ps.setString(2, gameId)
+            ps.executeQuery().use { it.next() }
+        }
+    }
+
+    fun partnerGameStats(partnerId: UUID): List<PartnerGameStats> = withConn { c ->
+        c.prepareStatement(
+            "SELECT g.id, g.title, count(r.id), count(r.redeemed_by) FROM partner_games pg " +
+                "JOIN games g ON g.id = pg.game_id " +
+                "LEFT JOIN redeem_codes r ON r.game_id = g.id AND r.partner_id = pg.partner_id " +
+                "WHERE pg.partner_id = ? GROUP BY g.id, g.title ORDER BY g.title"
+        ).use { ps ->
+            ps.setObject(1, partnerId)
+            ps.executeQuery().use { rs ->
+                val out = ArrayList<PartnerGameStats>()
+                while (rs.next()) out.add(PartnerGameStats(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getInt(4)))
+                out
+            }
+        }
+    }
+
+    /** Crée un lot de codes pour un partenaire. Renvoie false si cette référence de lot existe déjà. */
+    fun createPartnerCodes(
+        partnerId: UUID, gameId: String, reference: String, codeHashes: List<String>, expiresAt: Instant?
+    ): Boolean = withConn { c ->
+        c.autoCommit = false
+        try {
+            val inserted = c.prepareStatement(
+                "INSERT INTO code_batches (partner_id,reference,game_id,quantity) VALUES (?,?,?,?) ON CONFLICT DO NOTHING"
+            ).use { ps ->
+                ps.setObject(1, partnerId); ps.setString(2, reference); ps.setString(3, gameId); ps.setInt(4, codeHashes.size)
+                ps.executeUpdate()
+            }
+            if (inserted == 0) {
+                c.rollback()
+                return@withConn false
+            }
+            c.prepareStatement("INSERT INTO redeem_codes (id,code_hash,game_id,expires_at,partner_id) VALUES (?,?,?,?,?)").use { ps ->
+                for (h in codeHashes) {
+                    ps.setObject(1, UUID.randomUUID()); ps.setString(2, h); ps.setString(3, gameId)
+                    ps.setTimestamp(4, expiresAt?.let { Timestamp.from(it) }); ps.setObject(5, partnerId)
+                    ps.addBatch()
+                }
+                ps.executeBatch()
+            }
+            c.commit()
+            true
         } catch (e: Exception) {
             c.rollback()
             throw e

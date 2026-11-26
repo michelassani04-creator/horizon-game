@@ -68,3 +68,27 @@ docker compose exec db pg_dump -U horizon horizon > sauvegarde.sql
 - `POST /v1/me/orders {gameId, provider:"sandbox"}` crée une commande ; seul le serveur la passe en `paid`.
 - Fournisseur `sandbox` = paiement de TEST (aucun argent réel). Confirmation depuis `/admin` (Commandes → « Simuler : payé ») ou par webhook signé HMAC-SHA256 (`X-Horizon-Signature`) si `SANDBOX_WEBHOOK_SECRET` (≥ 24 caractères) est défini.
 - `POST /v1/me/games/{id}/claim` : jeux gratuits (prix 0).
+
+## Partenaires : éditeurs et revendeurs (v0.6)
+
+Créés dans `/admin` (section Partenaires). Chaque partenaire reçoit une clé `hzp_…` affichée une seule fois (seul son hachage est stocké) et n'agit que sur les jeux qui lui sont autorisés.
+
+| Méthode | Chemin | Rôle |
+|---|---|---|
+| GET | `/v1/partner/games` | ses jeux, avec codes créés / utilisés |
+| POST | `/v1/partner/codes` | crée un lot de codes (1 à 500) |
+
+```
+curl -X POST https://horizon-game.onrender.com/v1/partner/codes \
+  -H "X-Partner-Key: hzp_..." -H "Content-Type: application/json" \
+  -d '{"gameId":"mon-jeu","count":10,"reference":"commande-0001"}'
+```
+
+`reference` est obligatoire et unique par partenaire : si la requête est rejouée, le serveur répond 409 `duplicate_reference` au lieu de recréer des codes. Le joueur saisit le code dans l'application (« Saisir un code »).
+
+## Portail éditeurs (v0.7)
+
+- Page `/portal` : inscription, contrat, jeux, codes, ventes. Page `/admin` : refonte (éditeurs, validation des jeux, reversements).
+- Parcours : inscription → l'admin fixe la commission → l'éditeur signe en ligne (texte exact, empreinte, date, IP et navigateur conservés dans `contract_signatures`) → l'admin valide → l'éditeur soumet ses jeux (brouillon → en validation → publié ou refusé avec motif) et crée ses codes.
+- Le modèle de contrat est `src/main/resources/contract/v1.txt` (placeholders `{{COMPANY}}`, `{{COMMISSION}}`…). À faire relire par un juriste avant usage réel ; toute modification d'article doit changer `Contract.VERSION`.
+- Les ventes de test (`provider = sandbox`) ne comptent jamais dans les reversements.

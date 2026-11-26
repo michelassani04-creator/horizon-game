@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HORIZON Éditeurs</title>
+<style>
+  :root {
+    --paper:#F3F6FB; --white:#fff; --ink:#0D1526; --soft:#4A5872; --line:#DCE3EF; --night:#0B1120; --deep:#10203D;
+    --blue:#1668E3; --blue-soft:#E8F0FD; --red:#E5304F; --amber:#B7791F; --amber-soft:#FFF4DC; --green:#12805C; --green-soft:#DFF5EC; --red-soft:#FDE7EB;
+    --r:10px;
+  }
+  * { box-sizing:border-box; }
+  html { color-scheme:light; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3 { margin:0; letter-spacing:-.025em; line-height:1.15; }
+  button,input,select,textarea { font:inherit; color:inherit; }
+  :focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+  .hidden { display:none !important; }
+  .muted { color:var(--soft); }
+  .num { font-variant-numeric:tabular-nums; }
+  .brand { font-weight:800; letter-spacing:.12em; font-size:15px; }
+  .brand b { color:var(--blue); font-weight:800; }
+
+  /* Accueil : un lever de soleil sur l'horizon, seul élément décoratif */
+  #auth { min-height:100vh; display:grid; grid-template-columns:1.1fr 1fr; }
+  .hero { position:relative; overflow:hidden; background:var(--night); color:#fff; padding:48px clamp(24px,5vw,72px); display:flex; flex-direction:column; justify-content:space-between; min-height:340px; }
+  .hero::before { content:""; position:absolute; left:-20%; right:-20%; bottom:-55%; height:90%; border-radius:50%;
+    background:radial-gradient(closest-side,rgba(255,59,92,.55),rgba(47,140,255,.35) 55%,transparent 72%); }
+  .hero::after { content:""; position:absolute; left:0; right:0; bottom:26%; height:2px; background:linear-gradient(90deg,transparent,#2F8CFF 25%,#FF3B5C 75%,transparent); box-shadow:0 0 26px 2px rgba(47,140,255,.6); }
+  .hero > * { position:relative; z-index:1; }
+  .hero h1 { font-size:clamp(34px,4.6vw,56px); max-width:13ch; }
+  .hero p { max-width:44ch; color:#B9C6DD; margin:16px 0 0; font-size:17px; }
+  .hero .brand b { color:#5AA2FF; }
+  .hero ul { margin:0 0 clamp(150px,29vh,270px); padding:0; list-style:none; display:grid; gap:10px; color:#D6E0F2; max-width:44ch; }
+  .hero li { padding-left:22px; position:relative; }
+  .hero li::before { content:""; position:absolute; left:0; top:.6em; width:10px; height:2px; background:#5AA2FF; }
+  .auth-side { display:grid; place-items:center; padding:32px 20px; }
+  .auth-box { width:min(420px,100%); }
+  .auth-box h2 { font-size:28px; margin-bottom:6px; }
+  .tabs { display:flex; gap:4px; background:var(--line); padding:4px; border-radius:12px; margin:18px 0 20px; }
+  .tabs button { flex:1; border:0; background:transparent; padding:9px; border-radius:9px; font-weight:650; color:var(--soft); cursor:pointer; }
+  .tabs button[aria-selected="true"] { background:var(--white); color:var(--ink); box-shadow:0 1px 3px rgba(13,21,38,.12); }
+
+  /* Portail */
+  header.top { background:var(--white); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
+  .top-in { max-width:1080px; margin:0 auto; padding:0 20px; display:flex; align-items:center; gap:24px; min-height:58px; }
+  .top-in nav { display:flex; gap:2px; overflow-x:auto; flex:1; }
+  .top-in nav button { border:0; background:none; padding:18px 12px 15px; color:var(--soft); font-weight:600; cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap; }
+  .top-in nav button[aria-current="page"] { color:var(--ink); border-bottom-color:var(--blue); }
+  .top-in nav button:disabled { opacity:.4; cursor:default; }
+  main { max-width:1080px; margin:0 auto; padding:30px 20px 90px; }
+  .page-head { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:22px; }
+  .page-head h2 { font-size:28px; }
+
+  .btn { border:1px solid transparent; background:var(--blue); color:#fff; padding:10px 16px; border-radius:var(--r); font-weight:650; cursor:pointer; }
+  .btn:hover { filter:brightness(1.08); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn.ghost { background:var(--white); border-color:var(--line); color:var(--ink); }
+  .btn.ghost:hover { background:var(--paper); }
+  .btn.sm { padding:6px 11px; font-size:14px; }
+  .btn.block { width:100%; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+  /* Parcours : une vraie suite d'étapes */
+  .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:0; margin-bottom:26px; counter-reset:s; }
+  .step { position:relative; padding-top:18px; color:var(--soft); font-size:14px; font-weight:600; }
+  .step::before { content:""; position:absolute; top:0; left:0; right:6px; height:4px; border-radius:2px; background:var(--line); }
+  .step.done::before { background:var(--blue); }
+  .step.now { color:var(--ink); }
+  .step.now::before { background:linear-gradient(90deg,var(--blue),var(--red)); }
+  .step small { display:block; font-weight:400; color:var(--soft); }
+
+  .panel { background:var(--white); border:1px solid var(--line); border-radius:14px; padding:22px; margin-bottom:18px; }
+  .panel h3 { font-size:19px; margin-bottom:8px; }
+  .next { border-left:4px solid var(--blue); }
+  .figures { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); border:1px solid var(--line); border-radius:14px; background:var(--white); margin-bottom:18px; }
+  .figure { padding:16px 18px; border-right:1px solid var(--line); }
+  .figure:last-child { border-right:0; }
+  .figure b { display:block; font-size:28px; letter-spacing:-.03em; }
+  .figure span { color:var(--soft); font-size:14px; }
+
+  .list { background:var(--white); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .item { display:grid; grid-template-columns:1fr auto; gap:6px 16px; align-items:center; padding:16px 20px; border-top:1px solid var(--line); }
+  .item:first-child { border-top:0; }
+  .item .t { font-weight:650; font-size:17px; }
+  .item .s { color:var(--soft); font-size:14px; margin-top:2px; overflow-wrap:anywhere; }
+  .empty { padding:30px 20px; text-align:center; color:var(--soft); }
+  .pill { display:inline-block; font-size:12px; font-weight:650; padding:2px 9px; border-radius:999px; margin-left:8px; vertical-align:middle; background:var(--line); }
+  .pill.ok { background:var(--green-soft); color:var(--green); }
+  .pill.wait { background:var(--amber-soft); color:var(--amber); }
+  .pill.bad { background:var(--red-soft); color:var(--red); }
+  .pill.info { background:var(--blue-soft); color:var(--blue); }
+  .notice { background:var(--red-soft); color:#8A1B31; border-radius:10px; padding:10px 14px; margin-top:8px; font-size:14px; }
+
+  /* Contrat : texte de lecture */
+  .contract { font:17px/1.7 Georgia,"Times New Roman",serif; white-space:pre-wrap; max-width:68ch; margin:0 auto; padding:8px 0; }
+  .sign { max-width:68ch; margin:26px auto 0; border-top:1px solid var(--line); padding-top:20px; }
+
+  .field { margin-bottom:12px; }
+  .field label { display:block; font-size:14px; color:var(--soft); margin-bottom:4px; font-weight:550; }
+  .field .hint { font-size:13px; color:var(--soft); margin-top:3px; }
+  input,select,textarea { width:100%; padding:10px 12px; border-radius:var(--r); border:1px solid #C5CFE0; background:var(--white); }
+  textarea { min-height:100px; resize:vertical; }
+  .check { display:flex; gap:10px; align-items:flex-start; }
+  .check input { width:auto; margin-top:5px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  th,td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--soft); font-weight:600; font-size:14px; }
+  td.r,th.r { text-align:right; }
+
+  dialog { border:0; border-radius:16px; background:var(--white); color:var(--ink); padding:0; width:min(640px,calc(100% - 24px)); max-height:92vh; box-shadow:0 30px 80px rgba(13,21,38,.35); }
+  dialog::backdrop { background:rgba(11,17,32,.6); }
+  dialog form { padding:24px; display:flex; flex-direction:column; gap:12px; max-height:92vh; overflow:auto; }
+  dialog h3 { font-size:21px; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+  pre.secret { background:var(--paper); border:1px solid var(--line); border-radius:var(--r); padding:12px; white-space:pre-wrap; word-break:break-all; font:14px/1.6 ui-monospace,Menlo,monospace; max-height:300px; overflow:auto; user-select:all; }
+
+  #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:12px 18px; border-radius:12px; max-width:92%; display:none; z-index:50; }
+  #toast.err { background:var(--red); }
+
+  @media (max-width:860px) {
+    #auth { grid-template-columns:1fr; }
+    .hero { min-height:0; padding:28px 22px 130px; }
+    .hero ul { display:none; }
+    .item > * { min-width:0; }
+    .item { grid-template-columns:1fr; }
+    .two { grid-template-columns:1fr; }
+    .steps { grid-template-columns:1fr 1fr; row-gap:10px; }
+    .figure { border-right:0; border-bottom:1px solid var(--line); }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+
+<section id="auth">
+  <div class="hero">
+    <div class="brand">HORIZON <b>ÉDITEURS</b></div>
+    <div>
+      <h1>Vos jeux, sur la console HORIZON.</h1>
+      <p>Un contrat clair, une validation rapide et des ventes que vous suivez vous-même.</p>
+    </div>
+    <ul>
+      <li>Contrat signé en ligne, conservé avec sa preuve de signature.</li>
+      <li>Vos jeux téléchargés dans l'application, sans APK séparé.</li>
+      <li>Codes de téléchargement à vendre sur votre site ou en magasin.</li>
+      <li>Ventes et reversements visibles à tout moment.</li>
+    </ul>
+  </div>
+  <div class="auth-side">
+    <div class="auth-box">
+      <h2 id="authTitle">Connexion</h2>
+      <div class="muted" id="authSub">Accède à ton espace éditeur.</div>
+      <div class="tabs" role="tablist">
+        <button id="tabIn" role="tab" aria-selected="true" type="button">Se connecter</button>
+        <button id="tabUp" role="tab" aria-selected="false" type="button">Créer un compte</button>
+      </div>
+      <form id="authForm"></form>
+    </div>
+  </div>
+</section>
+
+<div id="portal" class="hidden">
+  <header class="top"><div class="top-in">
+    <div class="brand">HORIZON <b>ÉDITEURS</b></div>
+    <nav id="nav"></nav>
+    <button id="logout" class="btn ghost sm" type="button">Se déconnecter</button>
+  </div></header>
+  <main id="main"></main>
+</div>
+
+<dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+<div id="toast" role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+  var KEY = "hz_pub";
+  var token = "";
+  try { token = localStorage.getItem(KEY) || ""; } catch (e) {}
+  var $ = function (id) { return document.getElementById(id); };
+  var me = null, tab = "home", games = [], sales = null, mode = "in";
+
+  function h(tag, attrs, kids) {
+    var el = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === "class") el.className = attrs[k];
+      else if (k === "text") el.textContent = attrs[k];
+      else if (k.slice(0, 2) === "on") el[k] = attrs[k];
+      else el.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) { if (c) el.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return el;
+  }
+  function toast(msg, isErr) {
+    var t = $("toast"); t.textContent = msg; t.className = isErr ? "err" : ""; t.style.display = "block";
+    clearTimeout(toast.h); toast.h = setTimeout(function () { t.style.display = "none"; }, 4500);
+  }
+  function api(method, path, body, noAuth) {
+    var opts = { method: method, headers: {} };
+    if (!noAuth && token) opts.headers["Authorization"] = "Bearer " + token;
+    if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+    return fetch("/v1/publisher" + path, opts).then(function (r) {
+      if (r.status === 204) return null;
+      return r.text().then(function (txt) {
+        var data = null; try { data = txt ? JSON.parse(txt) : null; } catch (e) {}
+        if (!r.ok) { var err = new Error((data && data.message) || ("Erreur " + r.status)); err.status = r.status; err.code = data && data.error; throw err; }
+        return data;
+      });
+    });
+  }
+  function fail(er) { toast(er.message, true); }
+  function pill(text, cls) { return h("span", { "class": "pill " + (cls || ""), text: text }); }
+  function money(cents, cur) { return (cents / 100).toFixed(2).replace(".", ",") + " " + ({ USD: "$", EUR: "€", CDF: "FC" }[cur] || cur); }
+  function when(iso) { return iso ? iso.slice(0, 10) : ""; }
+
+  /* ---------- Fenêtres ---------- */
+  function ask(title, fields, okText, intro) {
+    return new Promise(function (resolve) {
+      var dlg = $("dlg"), form = $("dlgForm"), inputs = {}, done = false, grid = null;
+      form.textContent = "";
+      form.appendChild(h("h3", { text: title }));
+      if (intro) form.appendChild(h("div", { "class": "muted", text: intro }));
+      fields.forEach(function (f) {
+        var box = h("div", { "class": "field" }), input;
+        if (f.type === "check") {
+          input = h("input", { type: "checkbox", id: "ff_" + f.name }); input.checked = !!f.value;
+          box = h("label", { "class": "check" }, [input, h("span", { text: f.label })]);
+        } else {
+          box.appendChild(h("label", { "for": "ff_" + f.name, text: f.label }));
+          if (f.type === "textarea") input = h("textarea", { id: "ff_" + f.name });
+          else if (f.type === "select") {
+            input = h("select", { id: "ff_" + f.name });
+            f.options.forEach(function (o) { input.appendChild(h("option", { value: o[0], text: o[1] })); });
+          } else if (f.type === "file") {
+            input = h("input", { type: "file", id: "ff_" + f.name });
+            input.onchange = function () { fileHash(input.files[0], inputs, f); };
+          } else input = h("input", { id: "ff_" + f.name, type: f.type || "text" });
+          if (f.type !== "file") input.value = f.value == null ? "" : f.value;
+          if (f.readonly) input.readOnly = true;
+          if (f.placeholder) input.placeholder = f.placeholder;
+          if (f.step) input.step = f.step;
+          box.appendChild(input);
+          if (f.hint) box.appendChild(h("div", { "class": "hint", id: "hint_" + f.name, text: f.hint }));
+        }
+        inputs[f.name] = input;
+        if (f.half) {
+          if (!grid || grid.children.length >= 2) { grid = h("div", { "class": "two" }); form.appendChild(grid); }
+          grid.appendChild(box);
+        } else { grid = null; form.appendChild(box); }
+      });
+      var ok = h("button", { "class": "btn", type: "submit", text: okText || "Enregistrer" });
+      var cancel = h("button", { "class": "btn ghost", type: "button", text: "Annuler" });
+      form.appendChild(h("div", { "class": "actions" }, [cancel, ok]));
+      function finish(v) { if (done) return; done = true; if (dlg.open) dlg.close(); resolve(v); }
+      cancel.onclick = function () { finish(null); };
+      dlg.oncancel = function () { finish(null); };
+      form.onsubmit = function (ev) {
+        ev.preventDefault();
+        var out = {};
+        fields.forEach(function (f) { if (f.type === "file") return; var i = inputs[f.name]; out[f.name] = f.type === "check" ? i.checked : i.value; });
+        finish(out);
+      };
+      dlg.showModal();
+    });
+  }
+  function fileHash(file, inputs, f) {
+    if (!file) return;
+    var hint = $("hint_" + f.name);
+    if (hint) hint.textContent = "Calcul de l'empreinte… un gros fichier peut prendre un moment.";
+    file.arrayBuffer().then(function (buf) { return crypto.subtle.digest("SHA-256", buf); }).then(function (d) {
+      var hex = Array.prototype.map.call(new Uint8Array(d), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+      if (inputs[f.fillSha]) inputs[f.fillSha].value = hex;
+      if (inputs[f.fillSize]) inputs[f.fillSize].value = Math.max(1, Math.round(file.size / 1048576));
+      if (hint) hint.textContent = "Taille et empreinte remplies à partir de « " + file.name + " ».";
+    }).catch(function () { if (hint) hint.textContent = "Fichier trop gros pour ce navigateur : colle l'empreinte à la main."; });
+  }
+  function showSecret(title, text, note, filename) {
+    var dlg = $("dlg"), form = $("dlgForm");
+    form.textContent = "";
+    form.appendChild(h("h3", { text: title }));
+    form.appendChild(h("pre", { "class": "secret", text: text }));
+    if (note) form.appendChild(h("div", { "class": "muted", text: note }));
+    var copy = h("button", { "class": "btn", type: "button", text: "Copier" });
+    copy.onclick = function () { try { navigator.clipboard.writeText(text).then(function () { toast("Copié."); }); } catch (e) { toast("Sélectionne le texte et copie-le.", true); } };
+    var dl = h("button", { "class": "btn ghost", type: "button", text: "Télécharger (.txt)" });
+    dl.onclick = function () {
+      var a = h("a", { href: URL.createObjectURL(new Blob([text], { type: "text/plain" })), download: filename || "codes.txt" });
+      document.body.appendChild(a); a.click(); a.remove();
+    };
+    var close = h("button", { "class": "btn ghost", type: "submit", text: "Fermer" });
+    form.appendChild(h("div", { "class": "actions" }, [dl, copy, close]));
+    form.onsubmit = function () { dlg.close(); };
+    dlg.oncancel = null;
+    dlg.showModal();
+  }
+
+  /* ---------- Connexion et inscription ---------- */
+  function field(id, label, type, extra) {
+    var input = h("input", { id: id, type: type || "text", autocomplete: (extra && extra.ac) || "off" });
+    if (extra && extra.ph) input.placeholder = extra.ph;
+    return h("div", { "class": "field" }, [h("label", { "for": id, text: label }), input]);
+  }
+  function drawAuth() {
+    var f = $("authForm"); f.textContent = "";
+    $("tabIn").setAttribute("aria-selected", mode === "in"); $("tabUp").setAttribute("aria-selected", mode === "up");
+    $("authTitle").textContent = mode === "in" ? "Connexion" : "Créer un compte éditeur";
+    $("authSub").textContent = mode === "in" ? "Accède à ton espace éditeur." : "Gratuit. Tu signes le contrat après l'accord de HORIZON sur tes conditions.";
+    if (mode === "in") {
+      f.appendChild(field("a_email", "Adresse e-mail", "email", { ac: "username" }));
+      f.appendChild(field("a_pass", "Mot de passe", "password", { ac: "current-password" }));
+    } else {
+      f.appendChild(field("a_company", "Nom du studio ou de l'entreprise"));
+      f.appendChild(field("a_contact", "Nom du responsable", "text", { ac: "name" }));
+      f.appendChild(field("a_email", "Adresse e-mail", "email", { ac: "username" }));
+      f.appendChild(h("div", { "class": "two" }, [field("a_country", "Pays", "text", { ph: "RDC" }), field("a_phone", "Téléphone (facultatif)", "tel", { ph: "+243…" })]));
+      f.appendChild(field("a_pass", "Mot de passe (8 caractères minimum)", "password", { ac: "new-password" }));
+    }
+    f.appendChild(h("button", { "class": "btn block", type: "submit", text: mode === "in" ? "Se connecter" : "Créer mon compte" }));
+  }
+  $("tabIn").onclick = function () { mode = "in"; drawAuth(); };
+  $("tabUp").onclick = function () { mode = "up"; drawAuth(); };
+  $("authForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    var v = function (id) { return ($(id) ? $(id).value : "").trim(); };
+    var p = mode === "in"
+      ? api("POST", "/login", { email: v("a_email"), password: $("a_pass").value }, true)
+      : api("POST", "/register", { email: v("a_email"), password: $("a_pass").value, companyName: v("a_company"), contactName: v("a_contact"), country: v("a_country"), phone: v("a_phone") || null }, true);
+    p.then(function (r) {
+      token = r.token; try { localStorage.setItem(KEY, token); } catch (e) {}
+      me = r.publisher; enter();
+    }).catch(fail);
+  };
+
+  /* ---------- Portail ---------- */
+  function enter() {
+    $("auth").classList.add("hidden"); $("portal").classList.remove("hidden");
+    tab = "home"; refresh();
+  }
+  function leave() {
+    token = ""; me = null; try { localStorage.removeItem(KEY); } catch (e) {}
+    $("portal").classList.add("hidden"); $("auth").classList.remove("hidden"); drawAuth();
+  }
+  function refresh() {
+    return api("GET", "/me").then(function (m) {
+      me = m;
+      var jobs = [];
+      if (m.status === "active" || m.status === "suspended") jobs.push(api("GET", "/sales").then(function (s) { sales = s; }));
+      if (m.status === "active") jobs.push(api("GET", "/games").then(function (g) { games = g.items; }));
+      return Promise.all(jobs);
+    }).then(render).catch(function (er) { if (er.status === 401) leave(); fail(er); });
+  }
+  $("logout").onclick = function () { api("POST", "/logout").catch(function () {}); leave(); };
+
+  var active = function () { return me && me.status === "active"; };
+  function render() {
+    var nav = $("nav"); nav.textContent = "";
+    [["home", "Accueil", true], ["contract", "Contrat", me.status !== "registered"], ["games", "Mes jeux", active()], ["codes", "Codes", active()], ["sales", "Ventes", active() || me.status === "suspended"]].forEach(function (t) {
+      var b = h("button", { type: "button", text: t[1], onclick: function () { tab = t[0]; render(); window.scrollTo(0, 0); } });
+      if (!t[2]) b.disabled = true;
+      if (tab === t[0]) b.setAttribute("aria-current", "page");
+      nav.appendChild(b);
+    });
+    var main = $("main"); main.textContent = "";
+    ({ home: pageHome, contract: pageContract, games: pageGames, codes: pageCodes, sales: pageSales })[tab](main);
+  }
+  function head(main, title, actions) { main.appendChild(h("div", { "class": "page-head" }, [h("h2", { text: title }), h("div", { "class": "row" }, actions || [])])); }
+
+  /* ---------- Accueil ---------- */
+  function pageHome(main) {
+    head(main, "Bonjour, " + me.contactName, [h("button", { "class": "btn ghost sm", text: "Actualiser", onclick: function () { refresh().then(function () { toast("À jour."); }); } })]);
+    var order = ["registered", "contract_ready", "signed", "active"];
+    var idx = Math.max(0, order.indexOf(me.status === "suspended" ? "active" : me.status));
+    var steps = h("div", { "class": "steps" });
+    [["Compte créé", "Fait", "Fait"], ["Contrat", "Signé", "À signer"], ["Validation", "Validé", "Par HORIZON"], ["Publication", "Actif", "Jeux et codes"]].forEach(function (s, i) {
+      var done = i < idx || (i === 3 && idx === 3);
+      steps.appendChild(h("div", { "class": "step " + (done ? "done" : (i === idx ? "now" : "")) }, [s[0], h("small", { text: done ? s[1] : s[2] })]));
+    });
+    main.appendChild(steps);
+    var msgs = {
+      registered: ["Ton compte est créé.", "HORIZON prépare maintenant tes conditions, dont la commission. Reviens sur cette page pour voir quand ton contrat est prêt."],
+      contract_ready: ["Ton contrat est prêt à signer.", "Lis-le en entier, puis signe-le en ligne."],
+      signed: ["Contrat signé le " + when(me.signedAt) + ".", "HORIZON doit maintenant le valider. Tu pourras ensuite soumettre tes jeux et créer des codes."],
+      active: ["Ton compte est actif.", "Tu peux soumettre des jeux et créer des codes."],
+      suspended: ["Ton compte est suspendu.", "Contacte HORIZON pour en connaître la raison. Tu gardes l'accès à tes ventes."]
+    };
+    var m = msgs[me.status];
+    var panel = h("div", { "class": "panel next" }, [h("h3", { text: m[0] }), h("div", { "class": "muted", text: m[1] })]);
+    if (me.status === "contract_ready") panel.appendChild(h("div", { style: "margin-top:14px" }, [h("button", { "class": "btn", text: "Lire et signer le contrat", onclick: function () { tab = "contract"; render(); } })]));
+    if (me.status === "active") panel.appendChild(h("div", { "class": "row", style: "margin-top:14px" }, [h("button", { "class": "btn", text: "Ajouter un jeu", onclick: function () { tab = "games"; render(); gameForm(null); } })]));
+    main.appendChild(panel);
+    if (active()) {
+      var fig = h("div", { "class": "figures" });
+      var count = function (s) { return games.filter(function (g) { return g.reviewStatus === s; }).length; };
+      var owed = (sales && sales.balances || []).map(function (b) { return money(b.balanceCents, b.currency); }).join(" et ") || "0";
+      [["Jeux publiés", count("approved")], ["En validation", count("pending")], ["Brouillons ou refusés", count("draft") + count("rejected")], ["Reste à te reverser", owed]].forEach(function (f) {
+        fig.appendChild(h("div", { "class": "figure" }, [h("b", { "class": "num", text: String(f[1]) }), h("span", { text: f[0] })]));
+      });
+      main.appendChild(fig);
+    }
+  }
+
+  /* ---------- Contrat ---------- */
+  function pageContract(main) {
+    head(main, "Contrat d'éditeur");
+    api("GET", "/contract").then(function (c) {
+      var box = h("div", { "class": "panel" });
+      box.appendChild(h("div", { "class": "muted", style: "text-align:center;margin-bottom:10px", text: "Version " + c.version + ", commission de HORIZON : " + c.commissionPercent + " %" }));
+      box.appendChild(h("div", { "class": "contract", text: c.text }));
+      if (c.status === "contract_ready") {
+        var name = h("input", { id: "s_name", autocomplete: "name", placeholder: "Prénom et nom" });
+        var chk = h("input", { type: "checkbox", id: "s_ok" });
+        var btn = h("button", { "class": "btn", type: "button", text: "Signer le contrat" });
+        btn.onclick = function () {
+          btn.disabled = true;
+          api("POST", "/contract/sign", { signedName: name.value, accept: chk.checked, sha256: c.sha256 }).then(function (m) {
+            me = m; toast("Contrat signé. HORIZON va le valider."); tab = "home"; render();
+          }).catch(function (er) { fail(er); btn.disabled = false; });
+        };
+        box.appendChild(h("div", { "class": "sign" }, [
+          h("h3", { text: "Signature", style: "margin-bottom:12px" }),
+          h("div", { "class": "field" }, [h("label", { "for": "s_name", text: "Écris ton nom complet" }), name]),
+          h("label", { "class": "check", style: "margin-bottom:14px" }, [chk, h("span", { text: "Lu et approuvé. Je suis habilité à engager " + me.companyName + "." })]),
+          btn,
+          h("div", { "class": "muted", style: "font-size:13px;margin-top:10px", text: "La date, ton adresse IP et ton navigateur sont enregistrés avec le texte exact que tu signes." })
+        ]));
+      } else {
+        box.appendChild(h("div", { "class": "sign" }, [
+          pill(me.status === "signed" ? "Signé, en attente de validation" : "Signé et validé", me.status === "signed" ? "wait" : "ok"),
+          h("div", { "class": "muted", style: "margin-top:8px", text: "Signé par " + (c.signedName || "") + " le " + when(c.signedAt) + "." + (me.validatedAt ? " Validé par HORIZON le " + when(me.validatedAt) + "." : "") })
+        ]));
+      }
+      main.appendChild(box);
+    }).catch(function (er) {
+      main.appendChild(h("div", { "class": "panel" }, [h("h3", { text: "Contrat pas encore disponible" }), h("div", { "class": "muted", text: er.message })]));
+    });
+  }
+
+  /* ---------- Jeux ---------- */
+  var cats = [["ACTION", "Action"], ["RACING", "Course"], ["PUZZLE", "Puzzle"], ["ADVENTURE", "Aventure"], ["STRATEGY", "Stratégie"]];
+  var review = { draft: ["Brouillon", "wait"], pending: ["En validation", "info"], approved: ["Publié", "ok"], rejected: ["Refusé", "bad"] };
+  function gameForm(pg) {
+    var g = pg ? pg.game : null;
+    var v = g || { id: "", title: "", category: "ACTION", description: "", ageRating: "12+", sizeMb: 0, packUrl: "", packSha256: "", versionCode: 1, versionName: "1.0", engine: "godot", engineVersion: "", priceCents: null, currency: "USD", compatibility: "DECLARED", packageName: null };
+    ask(g ? "Modifier « " + g.title + " »" : "Nouveau jeu", [
+      { name: "id", label: "Identifiant (minuscules, chiffres, tirets)", value: v.id, readonly: !!g, half: true, hint: "Ne change plus après la création." },
+      { name: "title", label: "Titre", value: v.title, half: true },
+      { name: "category", label: "Catégorie", type: "select", options: cats, value: v.category, half: true },
+      { name: "ageRating", label: "Âge conseillé", value: v.ageRating, half: true },
+      { name: "price", label: "Prix (0 = gratuit)", value: v.priceCents == null ? "" : (v.priceCents / 100).toFixed(2), half: true },
+      { name: "currency", label: "Devise", type: "select", options: [["USD", "USD ($)"], ["EUR", "EUR (€)"], ["CDF", "CDF (FC)"]], value: v.currency, half: true },
+      { name: "description", label: "Description (20 caractères minimum)", type: "textarea", value: v.description },
+      { name: "file", label: "Fichier de jeu de cet appareil (pour calculer l'empreinte)", type: "file", fillSha: "packSha256", fillSize: "sizeMb", hint: "Le fichier n'est pas envoyé : seuls sa taille et son empreinte SHA-256 sont calculées ici." },
+      { name: "packUrl", label: "Adresse de téléchargement du fichier (https://…)", value: v.packUrl || "" },
+      { name: "packSha256", label: "Empreinte SHA-256", value: v.packSha256 || "" },
+      { name: "sizeMb", label: "Taille (Mo)", type: "number", value: v.sizeMb, half: true },
+      { name: "versionName", label: "Version", value: v.versionName, half: true },
+      { name: "engine", label: "Moteur de jeu", value: v.engine || "", half: true },
+      { name: "engineVersion", label: "Version du moteur", value: v.engineVersion || "", half: true }
+    ], "Enregistrer le brouillon").then(function (f) {
+      if (!f) return;
+      var price = String(f.price).trim();
+      var body = {
+        id: f.id.trim(), title: f.title.trim(), publisher: me.companyName, category: f.category, description: f.description,
+        ageRating: f.ageRating.trim() || "12+", sizeMb: parseInt(f.sizeMb, 10) || 0, compatibility: v.compatibility, packageName: v.packageName,
+        packUrl: f.packUrl.trim() || null, packSha256: f.packSha256.trim() || null,
+        versionCode: v.versionCode || 1, versionName: f.versionName.trim() || "1.0",
+        engine: f.engine.trim() || null, engineVersion: f.engineVersion.trim() || null,
+        priceCents: price === "" ? null : Math.round(parseFloat(price.replace(",", ".")) * 100), currency: f.currency,
+        featured: false, published: false
+      };
+      api("PUT", "/games/" + encodeURIComponent(body.id), body).then(function () { toast("Brouillon enregistré."); return refresh(); }).catch(fail);
+    });
+  }
+  function pageGames(main) {
+    head(main, "Mes jeux", [h("button", { "class": "btn", text: "Ajouter un jeu", onclick: function () { gameForm(null); } })]);
+    var box = h("div", { "class": "list" });
+    if (!games.length) box.appendChild(h("div", { "class": "empty", text: "Tu n'as pas encore de jeu. Ajoute le premier : il sera visible dans le Store après validation par HORIZON." }));
+    games.forEach(function (pg) {
+      var g = pg.game, st = review[pg.reviewStatus] || [pg.reviewStatus, ""];
+      var price = g.priceCents == null ? "prix à définir" : (g.priceCents === 0 ? "gratuit" : money(g.priceCents, g.currency));
+      var left = h("div", {}, [
+        h("div", { "class": "t" }, [g.title, pill(st[0], st[1])]),
+        h("div", { "class": "s", text: price + ", version " + g.versionName + ", " + g.sizeMb + " Mo" + (pg.reviewStatus === "approved" ? ". Codes créés : " + pg.codesCreated + ", utilisés : " + pg.codesRedeemed : "") })
+      ]);
+      if (pg.reviewStatus === "rejected" && pg.reviewNote) left.appendChild(h("div", { "class": "notice", text: "Motif du refus : " + pg.reviewNote }));
+      var right = h("div", { "class": "row" });
+      if (pg.reviewStatus === "draft" || pg.reviewStatus === "rejected") {
+        right.appendChild(h("button", { "class": "btn sm ghost", text: "Modifier", onclick: function () { gameForm(pg); } }));
+        right.appendChild(h("button", { "class": "btn sm", text: "Envoyer pour validation", onclick: function () {
+          api("POST", "/games/" + g.id + "/submit", {}).then(function () { toast("Envoyé à HORIZON pour validation."); return refresh(); }).catch(fail);
+        } }));
+      }
+      box.appendChild(h("div", { "class": "item" }, [left, right]));
+    });
+    main.appendChild(box);
+    main.appendChild(h("p", { "class": "muted", style: "margin-top:14px;font-size:14px", text: "Une fois envoyé, un jeu ne se modifie plus ici tant qu'HORIZON ne l'a pas examiné." }));
+  }
+
+  /* ---------- Codes ---------- */
+  function pageCodes(main) {
+    head(main, "Codes de téléchargement");
+    var ready = games.filter(function (g) { return g.reviewStatus === "approved"; });
+    if (!ready.length) {
+      main.appendChild(h("div", { "class": "panel" }, [h("h3", { text: "Aucun jeu publié" }), h("div", { "class": "muted", text: "Tu pourras créer des codes dès qu'un de tes jeux aura été validé par HORIZON." })]));
+      return;
+    }
+    var box = h("div", { "class": "panel" });
+    box.appendChild(h("p", { "class": "muted", style: "margin-top:0", text: "Un code ne sert qu'une fois. Vends-le sur ton site ou en magasin : le joueur le saisit dans l'application pour obtenir le jeu. Les codes ne sont affichés qu'une seule fois." }));
+    var sel = h("select", { id: "c_game" }); ready.forEach(function (g) { sel.appendChild(h("option", { value: g.game.id, text: g.game.title })); });
+    var n = h("input", { id: "c_n", type: "number", value: "10", min: "1", max: "500" });
+    var exp = h("input", { id: "c_exp", type: "number", placeholder: "Sans limite", min: "1" });
+    var ref = h("input", { id: "c_ref", value: "lot-" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "") });
+    box.appendChild(h("div", { "class": "field" }, [h("label", { "for": "c_game", text: "Jeu" }), sel]));
+    box.appendChild(h("div", { "class": "two" }, [
+      h("div", { "class": "field" }, [h("label", { "for": "c_n", text: "Nombre de codes (1 à 500)" }), n]),
+      h("div", { "class": "field" }, [h("label", { "for": "c_exp", text: "Valable (jours)" }), exp])
+    ]));
+    box.appendChild(h("div", { "class": "field" }, [h("label", { "for": "c_ref", text: "Référence du lot" }), ref, h("div", { "class": "hint", text: "Unique pour chaque lot (ex. numéro de commande). Elle évite de créer deux fois les mêmes codes." })]));
+    var go = h("button", { "class": "btn", type: "button", text: "Créer les codes" });
+    go.onclick = function () {
+      go.disabled = true;
+      api("POST", "/codes", { gameId: sel.value, count: parseInt(n.value, 10), expiresInDays: exp.value ? parseInt(exp.value, 10) : null, reference: ref.value }).then(function (r) {
+        showSecret("Codes créés", r.codes.join("\n"), "Copie-les ou télécharge-les maintenant : ils ne seront plus affichés.", "codes-" + r.gameId + ".txt");
+        return refresh();
+      }).catch(fail).then(function () { go.disabled = false; });
+    };
+    box.appendChild(go);
+    main.appendChild(box);
+  }
+
+  /* ---------- Ventes ---------- */
+  function pageSales(main) {
+    head(main, "Ventes et reversements");
+    if (!sales) return;
+    var bal = h("div", { "class": "panel" }, [h("h3", { text: "Solde" })]);
+    if (!sales.balances.length) bal.appendChild(h("div", { "class": "muted", text: "Aucune vente réelle pour le moment." }));
+    else {
+      var tb = h("table", {}, [h("tr", {}, ["Devise", "Encaissé", "Commission HORIZON", "Ta part", "Déjà reversé", "Reste à recevoir"].map(function (x, i) { return h("th", { "class": i ? "r" : "", text: x }); }))]);
+      sales.balances.forEach(function (b) {
+        tb.appendChild(h("tr", {}, [h("td", { text: b.currency }), h("td", { "class": "r num", text: money(b.grossCents, b.currency) }), h("td", { "class": "r num", text: money(b.commissionCents, b.currency) }),
+          h("td", { "class": "r num", text: money(b.dueCents, b.currency) }), h("td", { "class": "r num", text: money(b.paidCents, b.currency) }), h("td", { "class": "r num", text: money(b.balanceCents, b.currency) })]));
+      });
+      bal.appendChild(tb);
+    }
+    main.appendChild(bal);
+    var real = sales.lines.filter(function (l) { return !l.test; });
+    var byGame = h("div", { "class": "panel" }, [h("h3", { text: "Ventes par jeu" })]);
+    if (!real.length) byGame.appendChild(h("div", { "class": "muted", text: "Rien à afficher." }));
+    real.forEach(function (l) { byGame.appendChild(h("div", { "class": "item", style: "padding:10px 0" }, [h("div", { text: l.title }), h("div", { "class": "num", text: l.orders + " vente(s), " + money(l.grossCents, l.currency) })])); });
+    main.appendChild(byGame);
+    var pay = h("div", { "class": "panel" }, [h("h3", { text: "Reversements reçus" })]);
+    if (!sales.payouts.length) pay.appendChild(h("div", { "class": "muted", text: "Aucun reversement pour le moment." }));
+    sales.payouts.forEach(function (p) { pay.appendChild(h("div", { "class": "item", style: "padding:10px 0" }, [h("div", { text: when(p.createdAt) + (p.note ? ", " + p.note : "") }), h("div", { "class": "num", text: money(p.amountCents, p.currency) })])); });
+    main.appendChild(pay);
+    main.appendChild(h("p", { "class": "muted", style: "font-size:14px", text: "Les ventes de test ne sont jamais comptées. Les codes que tu vends toi-même ne passent pas par HORIZON : tu gardes ce que tu encaisses." }));
+  }
+
+  drawAuth();
+  if (token) { $("auth").classList.add("hidden"); $("portal").classList.remove("hidden"); refresh(); }
+})();
+</script>
+</body>
+</html>

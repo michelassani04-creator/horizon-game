@@ -153,6 +153,49 @@ data class AdminOrderDto(val order: OrderDto, val userName: String?)
 data class AdminOrdersResponse(val items: List<AdminOrderDto>)
 
 @Serializable
+data class PartnerDto(
+    val id: String,
+    val name: String,
+    /** publisher (éditeur) ou reseller (revendeur). */
+    val kind: String,
+    val active: Boolean,
+    val gameIds: List<String>,
+    val createdAt: String,
+    val codesCreated: Int,
+    val codesRedeemed: Int
+)
+
+@Serializable
+data class CreatePartnerRequest(val name: String, val kind: String, val gameIds: List<String> = emptyList())
+
+@Serializable
+data class UpdatePartnerRequest(val active: Boolean? = null, val gameIds: List<String>? = null)
+
+/** La clé d'accès n'est montrée qu'une seule fois, à la création ou au renouvellement. */
+@Serializable
+data class PartnerKeyResponse(val partner: PartnerDto, val apiKey: String)
+
+@Serializable
+data class PartnersResponse(val items: List<PartnerDto>)
+
+@Serializable
+data class PartnerCodesRequest(
+    val gameId: String,
+    val count: Int,
+    val expiresInDays: Int? = null,
+    /** Identifiant unique de ce lot de ton côté (ex. numéro de commande) : évite les doublons si la requête est rejouée. */
+    val reference: String
+)
+
+@Serializable
+data class PartnerGameStats(val gameId: String, val title: String, val total: Int, val redeemed: Int)
+
+@Serializable
+data class PartnerGamesResponse(val partner: String, val kind: String, val games: List<PartnerGameStats>)
+
+data class PartnerRow(val id: UUID, val name: String, val kind: String, val active: Boolean)
+
+@Serializable
 data class AdminStats(val users: Int, val games: Int, val activeSessions: Int)
 
 @Serializable

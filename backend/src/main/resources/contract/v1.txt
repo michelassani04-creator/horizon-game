@@ -1,0 +1,62 @@
+CONTRAT D'ÉDITEUR HORIZON GAME — version 1.0
+
+Entre :
+HORIZON GAME (« HORIZON »), plateforme de distribution de jeux, représentée par Assani Yuma Michel ;
+et
+{{COMPANY}} (« l'Éditeur »), représenté par {{CONTACT}}, adresse e-mail {{EMAIL}}, pays : {{COUNTRY}}.
+
+Article 1 — Objet
+Le présent contrat fixe les conditions dans lesquelles l'Éditeur publie et vend ses jeux sur le HORIZON Store, la boutique de l'application HORIZON GAME.
+
+Article 2 — Compte et validation
+2.1 Le contrat entre en vigueur lorsque HORIZON l'a validé, après sa signature en ligne par l'Éditeur. Tant que HORIZON ne l'a pas validé, l'Éditeur ne peut ni soumettre de jeu ni créer de code.
+2.2 L'Éditeur garantit que les informations de son compte sont exactes et que la personne qui signe est habilitée à l'engager.
+
+Article 3 — Contenu des jeux
+3.1 L'Éditeur garantit qu'il détient tous les droits nécessaires sur ses jeux et sur les éléments qu'ils contiennent (code, images, sons, musiques, marques).
+3.2 Sont interdits : les logiciels malveillants, les contenus illicites, les contenus sexuels impliquant des mineurs, les contenus incitant à la haine ou à la violence contre des personnes, et toute atteinte aux droits d'un tiers.
+3.3 L'Éditeur indique pour chaque jeu une classification d'âge exacte.
+
+Article 4 — Validation des jeux
+4.1 Chaque jeu est soumis à HORIZON avant sa mise en ligne. HORIZON peut l'accepter, le refuser en indiquant le motif, ou demander des corrections.
+4.2 HORIZON peut retirer un jeu du Store si celui-ci enfreint le présent contrat ou la loi. Les joueurs qui l'ont déjà obtenu conservent leur accès.
+
+Article 5 — Prix et ventes dans l'application
+5.1 L'Éditeur fixe le prix de ses jeux dans les devises acceptées par HORIZON.
+5.2 HORIZON encaisse le paiement auprès du joueur par l'intermédiaire de ses prestataires de paiement. Une vente n'est comptée qu'après confirmation du paiement par le prestataire. Les ventes de test ne donnent lieu à aucun reversement.
+
+Article 6 — Commission
+6.1 HORIZON retient {{COMMISSION}} % des montants effectivement encaissés pour les ventes de l'Éditeur dans l'application. L'Éditeur reçoit {{SHARE}} % de ces montants.
+6.2 Les frais des prestataires de paiement sont inclus dans la commission de HORIZON.
+
+Article 7 — Reversements
+7.1 L'Éditeur consulte ses ventes et son solde à tout moment sur son portail.
+7.2 HORIZON reverse à l'Éditeur la part qui lui revient au plus tard 30 jours après la fin de chaque mois, par le moyen de paiement convenu entre les parties. Chaque reversement est enregistré sur le portail.
+
+Article 8 — Codes de téléchargement
+8.1 L'Éditeur peut créer des codes de téléchargement pour ses jeux. Chaque code ne peut être utilisé qu'une seule fois, par un seul compte joueur.
+8.2 L'Éditeur qui vend ces codes par ses propres moyens (site, boutique, revendeurs) conserve la totalité de ce qu'il encaisse. HORIZON ne perçoit pas de commission sur ces ventes.
+8.3 L'Éditeur est responsable de la vente et de la sécurité des codes qu'il crée.
+
+Article 9 — Fichiers de jeu
+L'Éditeur fournit pour chaque jeu l'adresse de son fichier et son empreinte SHA-256 exacte. L'application vérifie cette empreinte après chaque téléchargement. Toute mise à jour du jeu est soumise à HORIZON dans les mêmes conditions.
+
+Article 10 — Propriété intellectuelle
+L'Éditeur reste propriétaire de ses jeux. Il accorde à HORIZON une licence non exclusive, limitée à la durée du contrat, pour héberger, présenter et distribuer ses jeux dans HORIZON GAME.
+
+Article 11 — Données des joueurs
+HORIZON gère les comptes et les données personnelles des joueurs. L'Éditeur n'y accède pas, sauf à travers des statistiques agrégées de ventes et d'utilisation de codes.
+
+Article 12 — Durée et résiliation
+12.1 Le contrat est conclu pour une durée indéterminée.
+12.2 Chaque partie peut y mettre fin avec un préavis de 30 jours, par écrit.
+12.3 HORIZON peut suspendre le compte de l'Éditeur ou résilier immédiatement le contrat en cas de manquement grave, notamment à l'article 3.
+
+Article 13 — Responsabilité
+Chaque partie répond des dommages qu'elle cause à l'autre par sa faute. L'Éditeur répond seul des réclamations de tiers portant sur le contenu de ses jeux.
+
+Article 14 — Droit applicable
+Le contrat est soumis au droit de la République démocratique du Congo. À défaut d'accord amiable, les tribunaux de Lubumbashi sont compétents.
+
+Article 15 — Signature électronique
+L'Éditeur signe en ligne en saisissant son nom et en déclarant lire et approuver le contrat. HORIZON enregistre le texte signé, son empreinte, la date, l'adresse IP et le navigateur utilisés. Ces éléments valent preuve de la signature entre les parties.

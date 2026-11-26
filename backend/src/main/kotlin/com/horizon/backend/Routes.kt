@@ -29,16 +29,16 @@ import java.util.UUID
 private val log = LoggerFactory.getLogger("Routes")
 
 /** JDBC est bloquant : on l'exécute hors des threads réseau. */
-private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) { block() }
+internal suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) { block() }
 
-private suspend inline fun <reified T : Any> ApplicationCall.body(): T =
+internal suspend inline fun <reified T : Any> ApplicationCall.body(): T =
     try {
         receive<T>()
     } catch (e: Exception) {
         throw badRequest("invalid_body", "Corps de requête invalide.")
     }
 
-private fun ApplicationCall.clientIp(trustProxy: Boolean): String {
+internal fun ApplicationCall.clientIp(trustProxy: Boolean): String {
     if (trustProxy) {
         request.headers["X-Forwarded-For"]?.substringBefore(',')?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
     }
@@ -53,7 +53,54 @@ private suspend fun ApplicationCall.authenticate(store: Store): AuthContext {
     return io { store.findSession(Security.sha256Hex(token)) } ?: throw unauthorized("Session expirée, reconnectez-vous.")
 }
 
-private fun tooMany() = ApiException(HttpStatusCode.TooManyRequests, "rate_limited", "Trop de tentatives, réessayez plus tard.")
+internal fun tooMany() = ApiException(HttpStatusCode.TooManyRequests, "rate_limited", "Trop de tentatives, réessayez plus tard.")
+
+/** Authentifie un partenaire par sa clé (en-tête X-Partner-Key ou Authorization: Bearer). */
+private suspend fun ApplicationCall.partnerAuth(config: AppConfig, store: Store, limiter: RateLimiter): PartnerRow {
+    val ip = clientIp(config.trustProxy)
+    if (limiter.count("partner-fail:$ip", 900_000) >= 20) throw tooMany()
+    val key = request.headers["X-Partner-Key"]
+        ?: request.headers["Authorization"]?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")
+        ?: ""
+    val partner = if (key.length in 20..200) io { store.findPartnerByKey(Security.sha256Hex(key.trim())) } else null
+    if (partner == null || !partner.active) {
+        limiter.allow("partner-fail:$ip", Int.MAX_VALUE, 900_000)
+        throw ApiException(HttpStatusCode.Unauthorized, "unauthorized", "Clé partenaire invalide ou désactivée.")
+    }
+    return partner
+}
+
+private fun Route.partnerRoutes(config: AppConfig, store: Store, limiter: RateLimiter) {
+    route("/partner") {
+        get("/games") {
+            val p = call.partnerAuth(config, store, limiter)
+            call.respond(PartnerGamesResponse(p.name, p.kind, io { store.partnerGameStats(p.id) }))
+        }
+        post("/codes") {
+            val p = call.partnerAuth(config, store, limiter)
+            val req = call.body<PartnerCodesRequest>()
+            Validation.gameId(req.gameId)
+            if (req.count !in 1..500) throw badRequest("invalid_count", "Nombre de codes : de 1 à 500.")
+            if (req.expiresInDays != null && req.expiresInDays !in 1..3650) throw badRequest("invalid_expiry", "Durée de validité invalide.")
+            val ref = req.reference.trim()
+            if (ref.length !in 1..80) throw badRequest("invalid_reference", "Référence du lot : 1 à 80 caractères.")
+            if (!limiter.allow("partner-batch:${p.id}", 60, 3_600_000)) throw tooMany()
+            if (!io { store.partnerOwnsGame(p.id, req.gameId) }) {
+                throw ApiException(HttpStatusCode.Forbidden, "game_not_allowed", "Ce jeu n'est pas autorisé pour ton compte.")
+            }
+            val codes = List(req.count) { Security.newRedeemCode() }
+            val expires = req.expiresInDays?.let { Instant.now().plus(it.toLong(), ChronoUnit.DAYS) }
+            val created = io {
+                store.createPartnerCodes(p.id, req.gameId, ref, codes.map { Security.sha256Hex(Security.normalizeCode(it)) }, expires)
+            }
+            if (!created) {
+                throw ApiException(HttpStatusCode.Conflict, "duplicate_reference", "Cette référence de lot a déjà été utilisée : les codes n'ont pas été recréés.")
+            }
+            log.info("Partenaire {} : {} codes pour {} (lot {})", p.name, codes.size, req.gameId, ref)
+            call.respond(HttpStatusCode.Created, CreateCodesResponse(req.gameId, codes))
+        }
+    }
+}
 
 fun Application.installRoutes(config: AppConfig, store: Store) {
     val limiter = RateLimiter()
@@ -80,6 +127,16 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
             )
             call.response.headers.append("X-Content-Type-Options", "nosniff")
             call.respondText(adminPageHtml, ContentType.Text.Html)
+        }
+
+        // Portail des éditeurs (page publique : l'API exige une session).
+        get("/portal") {
+            call.response.headers.append(
+                "Content-Security-Policy",
+                "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"
+            )
+            call.response.headers.append("X-Content-Type-Options", "nosniff")
+            call.respondText(portalPageHtml, ContentType.Text.Html)
         }
 
         route("/v1") {
@@ -350,8 +407,16 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
 
             // ---------- Publication de jeux (administrateur) ----------
             adminRoutes(config, store, limiter, providers)
+            partnerRoutes(config, store, limiter)
+            publisherRoutes(config, store, limiter)
+            adminPublisherRoutes(config, store, limiter)
         }
     }
+}
+
+private val portalPageHtml: String by lazy {
+    object {}.javaClass.getResourceAsStream("/portal/index.html")?.bufferedReader()?.readText()
+        ?: "<h1>Portail introuvable</h1>"
 }
 
 private val adminPageHtml: String by lazy {
@@ -423,6 +488,50 @@ private fun Route.adminRoutes(config: AppConfig, store: Store, limiter: RateLimi
         call.requireAdmin()
         val id = Validation.gameId(call.parameters["gameId"] ?: "")
         call.respond(io { store.codeStats(id) })
+    }
+
+    route("/admin/partners") {
+        get {
+            call.requireAdmin()
+            call.respond(PartnersResponse(io { store.listPartners() }))
+        }
+        post {
+            call.requireAdmin()
+            val req = call.body<CreatePartnerRequest>()
+            val name = req.name.trim()
+            if (name.length !in 2..80) throw badRequest("invalid_name", "Nom : 2 à 80 caractères.")
+            if (req.kind !in setOf("publisher", "reseller")) throw badRequest("invalid_kind", "Type : publisher ou reseller.")
+            req.gameIds.forEach { Validation.gameId(it) }
+            if (!io { store.gamesExist(req.gameIds) }) throw badRequest("game_not_found", "Un des jeux indiqués n'existe pas.")
+            val key = "hzp_" + Security.newToken()
+            val id = io { store.createPartner(name, req.kind, Security.sha256Hex(key), req.gameIds) }
+            val dto = io { store.getPartner(id) }!!
+            call.respond(HttpStatusCode.Created, PartnerKeyResponse(dto, key))
+        }
+        patch("/{id}") {
+            call.requireAdmin()
+            val id = runCatching { UUID.fromString(call.parameters["id"]) }.getOrNull()
+                ?: throw badRequest("invalid_id", "Identifiant invalide.")
+            val req = call.body<UpdatePartnerRequest>()
+            req.gameIds?.let { ids ->
+                ids.forEach { Validation.gameId(it) }
+                if (!io { store.gamesExist(ids) }) throw badRequest("game_not_found", "Un des jeux indiqués n'existe pas.")
+            }
+            if (!io { store.updatePartner(id, req.active, req.gameIds) }) {
+                throw ApiException(HttpStatusCode.NotFound, "partner_not_found", "Partenaire introuvable.")
+            }
+            call.respond(io { store.getPartner(id) }!!)
+        }
+        post("/{id}/rotate-key") {
+            call.requireAdmin()
+            val id = runCatching { UUID.fromString(call.parameters["id"]) }.getOrNull()
+                ?: throw badRequest("invalid_id", "Identifiant invalide.")
+            val key = "hzp_" + Security.newToken()
+            if (!io { store.rotatePartnerKey(id, Security.sha256Hex(key)) }) {
+                throw ApiException(HttpStatusCode.NotFound, "partner_not_found", "Partenaire introuvable.")
+            }
+            call.respond(PartnerKeyResponse(io { store.getPartner(id) }!!, key))
+        }
     }
 
     route("/admin/games") {

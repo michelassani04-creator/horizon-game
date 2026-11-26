@@ -116,3 +116,81 @@ CREATE TABLE IF NOT EXISTS orders (
     paid_at       TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id, created_at DESC);
+
+-- Partenaires (v0.6) : éditeurs de jeux et revendeurs. Seul le hachage de la clé d'accès est conservé.
+CREATE TABLE IF NOT EXISTS partners (
+    id          UUID PRIMARY KEY,
+    name        TEXT NOT NULL,
+    kind        TEXT NOT NULL,
+    key_hash    TEXT NOT NULL UNIQUE,
+    active      BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS partner_games (
+    partner_id  UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+    game_id     TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    PRIMARY KEY (partner_id, game_id)
+);
+ALTER TABLE redeem_codes ADD COLUMN IF NOT EXISTS partner_id UUID REFERENCES partners(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_codes_partner ON redeem_codes(partner_id);
+-- Un lot = une référence unique par partenaire : empêche de créer deux fois les mêmes codes si une requête est rejouée.
+CREATE TABLE IF NOT EXISTS code_batches (
+    partner_id  UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+    reference   TEXT NOT NULL,
+    game_id     TEXT NOT NULL,
+    quantity    INT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (partner_id, reference)
+);
+
+-- Portail éditeurs (v0.7) : comptes avec e-mail, contrat signé en ligne, validation des jeux, reversements.
+ALTER TABLE partners ALTER COLUMN key_hash DROP NOT NULL;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS contact_name TEXT;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS country TEXT;
+-- registered → contract_ready → signed → active (ou suspended). Les partenaires à clé API existants restent « active ».
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS commission_bp INT;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS contract_version TEXT;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS contract_signed_name TEXT;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS contract_signed_at TIMESTAMPTZ;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS contract_validated_at TIMESTAMPTZ;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS contract_note TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_partners_email ON partners (lower(email)) WHERE email IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS publisher_sessions (
+    token_hash  TEXT PRIMARY KEY,
+    partner_id  UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Preuve de signature : texte exact signé, son empreinte, la date, l'adresse IP et le navigateur.
+CREATE TABLE IF NOT EXISTS contract_signatures (
+    id           UUID PRIMARY KEY,
+    partner_id   UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+    version      TEXT NOT NULL,
+    text_sha256  TEXT NOT NULL,
+    contract_text TEXT NOT NULL,
+    commission_bp INT NOT NULL,
+    signed_name  TEXT NOT NULL,
+    signed_ip    TEXT,
+    signed_agent TEXT,
+    signed_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE games ADD COLUMN IF NOT EXISTS partner_id UUID REFERENCES partners(id) ON DELETE SET NULL;
+ALTER TABLE games ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'approved';
+ALTER TABLE games ADD COLUMN IF NOT EXISTS review_note TEXT;
+CREATE INDEX IF NOT EXISTS idx_games_partner ON games(partner_id);
+
+CREATE TABLE IF NOT EXISTS payouts (
+    id           UUID PRIMARY KEY,
+    partner_id   UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+    amount_cents BIGINT NOT NULL,
+    currency     TEXT NOT NULL,
+    note         TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
