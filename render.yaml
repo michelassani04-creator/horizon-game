@@ -19,4 +19,4 @@ services:
       - key: TRUST_PROXY
         value: "true"
       - key: LOG_CODES
-        value: "true"
+        value: "false"

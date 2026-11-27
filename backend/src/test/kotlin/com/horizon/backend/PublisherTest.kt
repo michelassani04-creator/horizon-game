@@ -38,4 +38,14 @@ class PublisherTest {
         assertEquals(700, b.paidCents)
         assertEquals(700, b.balanceCents)
     }
+
+    @Test
+    fun contractIgnoresPlaceholdersTypedByThePublisher() {
+        val text = Contract.render("{{COMMISSION}} SA", "{{SHARE}}", "a@b.cd", "{{COMPANY}}", 30.0)
+        // Les valeurs saisies sont insérées telles quelles, sans être ré-interprétées comme des marqueurs.
+        assertTrue(text.contains("{{COMMISSION}} SA"))
+        assertTrue(text.contains("{{SHARE}}"))
+        assertTrue(text.contains("{{COMPANY}}"))
+        assertTrue(text.contains("30 %"))
+    }
 }

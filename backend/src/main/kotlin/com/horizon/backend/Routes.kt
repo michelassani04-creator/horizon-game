@@ -38,12 +38,24 @@ internal suspend inline fun <reified T : Any> ApplicationCall.body(): T =
         throw badRequest("invalid_body", "Corps de requête invalide.")
     }
 
+/**
+ * Adresse du client. Derrière UN reverse proxy (Render, Caddy), seule la DERNIÈRE valeur de X-Forwarded-For
+ * a été ajoutée par ce proxy : les précédentes sont écrites par le client et ne sont jamais fiables.
+ * (Avec deux proxys en chaîne, par ex. Cloudflare puis Render, il faudrait prendre l'avant-dernière.)
+ */
 internal fun ApplicationCall.clientIp(trustProxy: Boolean): String {
     if (trustProxy) {
-        request.headers["X-Forwarded-For"]?.substringBefore(',')?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        request.headers.getAll("X-Forwarded-For")?.lastOrNull()
+            ?.substringAfterLast(',')?.trim()
+            ?.takeIf { it.isNotEmpty() && it.length <= 64 }
+            ?.let { return it }
     }
     return request.origin.remoteHost
 }
+
+/** Au-delà, on refuse sans même calculer le hachage (le mot de passe est limité à 128 caractères à l'inscription). */
+internal const val MAX_LOGIN_PASSWORD = 128
+internal const val MAX_LOGIN_IDENTIFIER = 254
 
 private suspend fun ApplicationCall.authenticate(store: Store): AuthContext {
     val header = request.headers["Authorization"] ?: throw unauthorized()
@@ -193,6 +205,9 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
                     val ip = call.clientIp(config.trustProxy)
                     val req = call.body<LoginRequest>()
                     val ident = req.identifier.trim().lowercase()
+                    if (ident.length > MAX_LOGIN_IDENTIFIER || req.password.length > MAX_LOGIN_PASSWORD) {
+                        throw ApiException(HttpStatusCode.Unauthorized, "invalid_credentials", "Identifiant ou mot de passe incorrect.")
+                    }
                     if (!limiter.allow("login-ip:$ip", 30, 900_000) || !limiter.allow("login-id:$ident", 10, 900_000)) throw tooMany()
                     val response = io {
                         val user = if ("@" in ident) store.findUserByEmail(ident)
@@ -200,6 +215,10 @@ fun Application.installRoutes(config: AppConfig, store: Store) {
                         val ok = Security.verifyPassword(req.password, user?.passwordHash ?: dummyHash)
                         if (user == null || !ok || user.status != "active") {
                             throw ApiException(HttpStatusCode.Unauthorized, "invalid_credentials", "Identifiant ou mot de passe incorrect.")
+                        }
+                        // Mise à niveau silencieuse d'un ancien hachage (moins d'itérations).
+                        if (Security.needsRehash(user.passwordHash)) {
+                            runCatching { store.updateUserPasswordHash(user.id, Security.hashPassword(req.password)) }
                         }
                         issueSession(user, req.deviceLabel)
                     }

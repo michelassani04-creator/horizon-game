@@ -8,7 +8,9 @@ import javax.crypto.spec.PBEKeySpec
 
 object Security {
     private val random = SecureRandom()
-    private const val ITERATIONS = 120_000
+    /** 600 000 : valeur recommandée par OWASP pour PBKDF2-HMAC-SHA256. Les anciens hachages (120 000) restent valides. */
+    private const val ITERATIONS = 600_000
+    private const val MAX_STORED_ITERATIONS = 5_000_000
     private const val KEY_BITS = 256
 
     /** Format : pbkdf2$itérations$sel$hash (Base64). */
@@ -22,11 +24,19 @@ object Security {
     fun verifyPassword(password: String, stored: String): Boolean {
         val parts = stored.split("$")
         if (parts.size != 4 || parts[0] != "pbkdf2") return false
-        val iterations = parts[1].toIntOrNull() ?: return false
+        val iterations = parts[1].toIntOrNull()?.takeIf { it in 1..MAX_STORED_ITERATIONS } ?: return false
         val salt = runCatching { Base64.getDecoder().decode(parts[2]) }.getOrNull() ?: return false
         val expected = runCatching { Base64.getDecoder().decode(parts[3]) }.getOrNull() ?: return false
         val actual = pbkdf2(password, salt, iterations)
         return MessageDigest.isEqual(expected, actual)
+    }
+
+    /** true si le hachage stocké utilise moins d'itérations que la valeur actuelle : à re-hacher après une connexion réussie. */
+    fun needsRehash(stored: String): Boolean {
+        val parts = stored.split("$")
+        if (parts.size != 4 || parts[0] != "pbkdf2") return false
+        val iterations = parts[1].toIntOrNull() ?: return false
+        return iterations < ITERATIONS
     }
 
     private fun pbkdf2(password: String, salt: ByteArray, iterations: Int): ByteArray {
@@ -60,15 +70,38 @@ object Security {
         MessageDigest.isEqual(a.toByteArray(Charsets.UTF_8), b.toByteArray(Charsets.UTF_8))
 }
 
-/** Limiteur de débit en mémoire (fenêtre glissante) : freine le brute-force sur un seul serveur. */
+/**
+ * Limiteur de débit en mémoire (fenêtre glissante) : freine le brute-force sur un seul serveur.
+ * La mémoire est bornée : clés tronquées, entrées inactives purgées, et au plus [MAX_KEYS] clés
+ * (les moins récemment utilisées sont évincées), même si un attaquant invente des clés à volonté.
+ * Toutes les fenêtres utilisées par l'application sont de 1 heure au plus.
+ */
 class RateLimiter {
-    private val hits = HashMap<String, ArrayDeque<Long>>()
+    private companion object {
+        const val MAX_KEY_LENGTH = 200
+        const val MAX_KEYS = 50_000
+        const val STALE_AFTER_MS = 3_600_000L
+        const val PURGE_EVERY = 1_000
+    }
+
+    private val hits = object : LinkedHashMap<String, ArrayDeque<Long>>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ArrayDeque<Long>>?): Boolean = size > MAX_KEYS
+    }
+    private var calls = 0
+
+    private fun norm(key: String) = if (key.length > MAX_KEY_LENGTH) key.substring(0, MAX_KEY_LENGTH) else key
+
+    private fun purgeIfDue(now: Long) {
+        if (++calls < PURGE_EVERY) return
+        calls = 0
+        hits.entries.removeIf { it.value.isEmpty() || now - it.value.last() > STALE_AFTER_MS }
+    }
 
     /** Nombre d'événements enregistrés dans la fenêtre, sans en ajouter. */
     @Synchronized
     fun count(key: String, windowMs: Long): Int {
         val now = System.currentTimeMillis()
-        val queue = hits[key] ?: return 0
+        val queue = hits[norm(key)] ?: return 0
         while (queue.isNotEmpty() && now - queue.first() > windowMs) queue.removeFirst()
         return queue.size
     }
@@ -76,13 +109,17 @@ class RateLimiter {
     @Synchronized
     fun allow(key: String, max: Int, windowMs: Long): Boolean {
         val now = System.currentTimeMillis()
-        val queue = hits.getOrPut(key) { ArrayDeque() }
+        purgeIfDue(now)
+        val queue = hits.getOrPut(norm(key)) { ArrayDeque() }
         while (queue.isNotEmpty() && now - queue.first() > windowMs) queue.removeFirst()
-        if (hits.size > 50_000) hits.entries.removeIf { it.value.isEmpty() }
         if (queue.size >= max) return false
         queue.addLast(now)
         return true
     }
+
+    /** Nombre de clés suivies (pour les tests). */
+    @Synchronized
+    fun size(): Int = hits.size
 }
 
 object Validation {
@@ -119,6 +156,18 @@ object Validation {
     fun displayName(raw: String): String {
         val v = raw.trim()
         if (v.length !in 2..32) throw badRequest("invalid_name", "Le pseudo doit contenir de 2 à 32 caractères.")
+        if (hasControlChars(v)) throw badRequest("invalid_name", "Le pseudo ne peut pas contenir de retour à la ligne ni de caractère de contrôle.")
+        return v
+    }
+
+    /** Retours à la ligne, tabulations et autres caractères de contrôle (y compris U+2028/U+2029). */
+    fun hasControlChars(v: String): Boolean = v.any { it.isISOControl() || it == '\u2028' || it == '\u2029' }
+
+    /** Texte d'une seule ligne (nom, pays…) : longueur bornée, aucun caractère de contrôle. */
+    fun line(raw: String, min: Int, max: Int, code: String, label: String): String {
+        val v = raw.trim()
+        if (v.length !in min..max) throw badRequest(code, "$label : $min à $max caractères.")
+        if (hasControlChars(v)) throw badRequest(code, "$label : pas de retour à la ligne ni de caractère de contrôle.")
         return v
     }
 
@@ -131,8 +180,11 @@ object Validation {
 
     fun game(g: GameDto): GameDto {
         gameId(g.id)
-        if (g.title.trim().length !in 1..80) throw badRequest("invalid_title", "Titre : 1 à 80 caractères.")
-        if (g.publisher.trim().length !in 1..80) throw badRequest("invalid_publisher", "Éditeur : 1 à 80 caractères.")
+        if (g.title.trim().length !in 1..80 || hasControlChars(g.title.trim())) throw badRequest("invalid_title", "Titre : 1 à 80 caractères, sur une seule ligne.")
+        if (g.publisher.trim().length !in 1..80 || hasControlChars(g.publisher.trim())) throw badRequest("invalid_publisher", "Éditeur : 1 à 80 caractères, sur une seule ligne.")
+        if (g.ageRating.length > 32) throw badRequest("invalid_age_rating", "Classification d'âge : 32 caractères maximum.")
+        if ((g.packageName?.length ?: 0) > 200) throw badRequest("invalid_package_name", "Nom de paquet : 200 caractères maximum.")
+        if ((g.apkUrl?.length ?: 0) > 2000 || (g.packUrl?.length ?: 0) > 2000) throw badRequest("invalid_url", "Adresse trop longue (2000 caractères maximum).")
         if (g.category !in categories) throw badRequest("invalid_category", "Catégorie inconnue.")
         if (g.compatibility !in compatibilities) throw badRequest("invalid_compatibility", "Compatibilité inconnue.")
         if (g.description.length > 4000) throw badRequest("invalid_description", "Description trop longue.")
@@ -157,7 +209,7 @@ object Validation {
         }
         if (g.currency !in setOf("USD", "EUR", "CDF")) throw badRequest("invalid_currency", "Devise non prise en charge (USD, EUR ou CDF).")
         if (g.versionCode < 1) throw badRequest("invalid_version", "Le numéro de version doit être au moins 1.")
-        if (g.versionName.trim().length !in 1..32) throw badRequest("invalid_version_name", "Nom de version : 1 à 32 caractères.")
+        if (g.versionName.trim().length !in 1..32 || hasControlChars(g.versionName.trim())) throw badRequest("invalid_version_name", "Nom de version : 1 à 32 caractères, sur une seule ligne.")
         if ((g.engine?.length ?: 0) > 32 || (g.engineVersion?.length ?: 0) > 32) {
             throw badRequest("invalid_engine", "Moteur : 32 caractères maximum.")
         }

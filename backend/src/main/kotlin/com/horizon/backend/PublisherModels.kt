@@ -140,14 +140,23 @@ object Contract {
         (if (p % 1.0 == 0.0) p.toInt().toString() else String.format(java.util.Locale.ROOT, "%.2f", p).trimEnd('0').trimEnd('.'))
             .replace('.', ',')
 
-    fun render(company: String, contact: String, email: String, country: String, commissionPercent: Double): String =
-        template
-            .replace("{{COMPANY}}", company)
-            .replace("{{CONTACT}}", contact)
-            .replace("{{EMAIL}}", email)
-            .replace("{{COUNTRY}}", country)
-            .replace("{{COMMISSION}}", formatPercent(commissionPercent))
-            .replace("{{SHARE}}", formatPercent(100.0 - commissionPercent))
+    private val placeholder = Regex("\\{\\{([A-Z]+)}}")
+
+    /**
+     * Remplace les {{MARQUEURS}} en UNE seule passe : une valeur saisie par l'éditeur (par ex. un nom de studio
+     * contenant « {{COMMISSION}} ») n'est jamais ré-interprétée comme un marqueur.
+     */
+    fun render(company: String, contact: String, email: String, country: String, commissionPercent: Double): String {
+        val values = mapOf(
+            "COMPANY" to company,
+            "CONTACT" to contact,
+            "EMAIL" to email,
+            "COUNTRY" to country,
+            "COMMISSION" to formatPercent(commissionPercent),
+            "SHARE" to formatPercent(100.0 - commissionPercent)
+        )
+        return placeholder.replace(template) { m -> values[m.groupValues[1]] ?: m.value }
+    }
 
     fun render(p: PublisherDto): String =
         render(p.companyName, p.contactName, p.email ?: "", p.country, p.commissionPercent ?: 0.0)

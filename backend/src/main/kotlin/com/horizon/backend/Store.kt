@@ -310,29 +310,34 @@ class Store(private val ds: DataSource) {
               updated_at=now()
             """.trimIndent()
         ).use { ps ->
-            ps.setString(1, g.id)
-            ps.setString(2, g.title)
-            ps.setString(3, g.publisher)
-            ps.setString(4, g.category)
-            ps.setString(5, g.description)
-            ps.setString(6, g.ageRating)
-            ps.setInt(7, g.sizeMb)
-            ps.setString(8, g.compatibility)
-            ps.setString(9, g.packageName)
-            ps.setString(10, g.apkUrl)
-            ps.setString(11, g.apkSha256)
-            ps.setBoolean(12, g.featured)
-            ps.setBoolean(13, g.published)
-            ps.setString(14, g.packUrl)
-            ps.setString(15, g.packSha256)
-            ps.setInt(16, g.versionCode)
-            ps.setString(17, g.versionName)
-            ps.setString(18, g.engine)
-            ps.setString(19, g.engineVersion)
-            if (g.priceCents == null) ps.setNull(20, java.sql.Types.INTEGER) else ps.setInt(20, g.priceCents)
-            ps.setString(21, g.currency)
+            bindGame(ps, g)
             ps.executeUpdate()
         }
+    }
+
+    /** Lie les 21 colonnes communes d'un jeu (paramètres 1 à 21). */
+    private fun bindGame(ps: java.sql.PreparedStatement, g: GameDto) {
+        ps.setString(1, g.id)
+        ps.setString(2, g.title)
+        ps.setString(3, g.publisher)
+        ps.setString(4, g.category)
+        ps.setString(5, g.description)
+        ps.setString(6, g.ageRating)
+        ps.setInt(7, g.sizeMb)
+        ps.setString(8, g.compatibility)
+        ps.setString(9, g.packageName)
+        ps.setString(10, g.apkUrl)
+        ps.setString(11, g.apkSha256)
+        ps.setBoolean(12, g.featured)
+        ps.setBoolean(13, g.published)
+        ps.setString(14, g.packUrl)
+        ps.setString(15, g.packSha256)
+        ps.setInt(16, g.versionCode)
+        ps.setString(17, g.versionName)
+        ps.setString(18, g.engine)
+        ps.setString(19, g.engineVersion)
+        if (g.priceCents == null) ps.setNull(20, java.sql.Types.INTEGER) else ps.setInt(20, g.priceCents)
+        ps.setString(21, g.currency)
     }
 
     fun deleteGame(id: String): Boolean = withConn { c ->
@@ -507,12 +512,47 @@ class Store(private val ds: DataSource) {
         }
     }
 
-    fun saveGameForPartner(partnerId: UUID, g: GameDto) {
-        upsertGame(g)
-        withConn { c ->
-            c.prepareStatement("UPDATE games SET partner_id = ?, review_status = 'draft', review_note = NULL WHERE id = ?").use { ps ->
-                ps.setObject(1, partnerId); ps.setString(2, g.id); ps.executeUpdate()
-            }
+    /**
+     * Enregistre le brouillon d'un éditeur en UNE seule requête, donc sans course possible :
+     * le jeu est créé, ou mis à jour seulement s'il appartient déjà à cet éditeur ET s'il est en brouillon
+     * ou refusé. Renvoie false (rien n'est modifié) dans tous les autres cas : identifiant pris par un autre
+     * éditeur ou par HORIZON, jeu en validation ou déjà publié.
+     */
+    fun saveGameForPartner(partnerId: UUID, g: GameDto): Boolean = withConn { c ->
+        c.prepareStatement(
+            """
+            INSERT INTO games (id,title,publisher,category,description,age_rating,size_mb,compatibility,package_name,apk_url,apk_sha256,featured,published,
+                               pack_url,pack_sha256,version_code,version_name,engine,engine_version,price_cents,currency,
+                               partner_id,review_status,review_note)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',NULL)
+            ON CONFLICT (id) DO UPDATE SET
+              title=EXCLUDED.title, publisher=EXCLUDED.publisher, category=EXCLUDED.category,
+              description=EXCLUDED.description, age_rating=EXCLUDED.age_rating, size_mb=EXCLUDED.size_mb,
+              compatibility=EXCLUDED.compatibility, package_name=EXCLUDED.package_name, apk_url=EXCLUDED.apk_url,
+              apk_sha256=EXCLUDED.apk_sha256, featured=EXCLUDED.featured, published=EXCLUDED.published,
+              pack_url=EXCLUDED.pack_url, pack_sha256=EXCLUDED.pack_sha256, version_code=EXCLUDED.version_code,
+              version_name=EXCLUDED.version_name, engine=EXCLUDED.engine, engine_version=EXCLUDED.engine_version,
+              price_cents=EXCLUDED.price_cents, currency=EXCLUDED.currency,
+              review_status='draft', review_note=NULL, updated_at=now()
+            WHERE games.partner_id = EXCLUDED.partner_id AND games.review_status IN ('draft','rejected')
+            """.trimIndent()
+        ).use { ps ->
+            bindGame(ps, g)
+            ps.setObject(22, partnerId)
+            ps.executeUpdate() > 0
+        }
+    }
+
+    /** Remplace un ancien hachage de mot de passe par un plus fort (même mot de passe, plus d'itérations). */
+    fun updateUserPasswordHash(userId: UUID, newHash: String) = withConn { c ->
+        c.prepareStatement("UPDATE users SET password_hash = ? WHERE id = ?").use { ps ->
+            ps.setString(1, newHash); ps.setObject(2, userId); ps.executeUpdate()
+        }
+    }
+
+    fun updatePublisherPasswordHash(partnerId: UUID, newHash: String) = withConn { c ->
+        c.prepareStatement("UPDATE partners SET password_hash = ? WHERE id = ? AND email IS NOT NULL").use { ps ->
+            ps.setString(1, newHash); ps.setObject(2, partnerId); ps.executeUpdate()
         }
     }
 
