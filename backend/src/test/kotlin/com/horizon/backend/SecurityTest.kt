@@ -69,4 +69,44 @@ class SecurityTest {
         assertEquals(null, provider.verifyWebhook({ "mauvaise-signature" }, body))
         assertEquals(null, SandboxProvider(null).verifyWebhook({ sig }, body))
     }
+
+    @Test
+    fun oldPasswordHashesStillWorkAndAreFlaggedForRehash() {
+        // Hachage au format historique (120 000 itérations) : toujours accepté, mais à re-hacher.
+        val salt = ByteArray(16) { it.toByte() }
+        val spec = javax.crypto.spec.PBEKeySpec("ancien-mot-de-passe".toCharArray(), salt, 120_000, 256)
+        val hash = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        val b64 = java.util.Base64.getEncoder()
+        val old = "pbkdf2\$120000\$${b64.encodeToString(salt)}\$${b64.encodeToString(hash)}"
+        assertTrue(Security.verifyPassword("ancien-mot-de-passe", old))
+        assertTrue(Security.needsRehash(old))
+        assertFalse(Security.needsRehash(Security.hashPassword("nouveau-mot-de-passe")))
+        assertFalse(Security.needsRehash("format-invalide"))
+    }
+
+    @Test
+    fun absurdIterationCountIsRejected() {
+        assertFalse(Security.verifyPassword("x", "pbkdf2\$2000000000\$AAAA\$AAAA"))
+    }
+
+    @Test
+    fun rateLimiterMemoryIsBounded() {
+        val limiter = RateLimiter()
+        repeat(120_000) { limiter.allow("login-id:inconnu-$it", 10, 900_000) }
+        assertTrue(limiter.size() <= 50_000)
+        // Une clé démesurée est tronquée : elle ne peut pas servir à gonfler la mémoire.
+        val long = "x".repeat(10_000)
+        repeat(3) { assertTrue(limiter.allow(long, 3, 60_000)) }
+        assertFalse(limiter.allow(long, 3, 60_000))
+    }
+
+    @Test
+    fun singleLineTextRejectsControlCharacters() {
+        assertEquals("Studio Kasai", Validation.line("  Studio Kasai ", 2, 80, "c", "Nom"))
+        assertFailsWith<ApiException> { Validation.line("Studio\nClause: 0 %", 2, 80, "c", "Nom") }
+        assertFailsWith<ApiException> { Validation.line("Studio\r\nFAUX LOG", 2, 80, "c", "Nom") }
+        assertFailsWith<ApiException> { Validation.line("Studio\u2028X", 2, 80, "c", "Nom") }
+        assertFailsWith<ApiException> { Validation.line("x", 2, 80, "c", "Nom") }
+        assertFailsWith<ApiException> { Validation.displayName("Jean\nAdmin") }
+    }
 }

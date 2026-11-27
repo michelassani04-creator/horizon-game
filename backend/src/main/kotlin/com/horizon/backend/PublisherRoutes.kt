@@ -54,6 +54,9 @@ fun Route.publisherRoutes(config: AppConfig, store: Store, limiter: RateLimiter)
         return PublisherAuthResponse(token, expires.toString(), p)
     }
 
+    // Hachage factice : garde un temps de réponse constant quand l'e-mail n'existe pas.
+    val dummyHash = Security.hashPassword("horizon-dummy-password")
+
     route("/publisher") {
         post("/register") {
             val ip = call.clientIp(config.trustProxy)
@@ -61,12 +64,9 @@ fun Route.publisherRoutes(config: AppConfig, store: Store, limiter: RateLimiter)
             val req = call.body<PublisherRegisterRequest>()
             val email = Validation.email(req.email)
             Validation.password(req.password)
-            val company = req.companyName.trim()
-            val contact = req.contactName.trim()
-            val country = req.country.trim()
-            if (company.length !in 2..80) throw badRequest("invalid_company", "Nom du studio : 2 à 80 caractères.")
-            if (contact.length !in 2..80) throw badRequest("invalid_contact", "Nom du responsable : 2 à 80 caractères.")
-            if (country.length !in 2..60) throw badRequest("invalid_country", "Pays : 2 à 60 caractères.")
+            val company = Validation.line(req.companyName, 2, 80, "invalid_company", "Nom du studio")
+            val contact = Validation.line(req.contactName, 2, 80, "invalid_contact", "Nom du responsable")
+            val country = Validation.line(req.country, 2, 60, "invalid_country", "Pays")
             val phone = req.phone?.takeIf { it.isNotBlank() }?.let { Validation.phone(it) }
             val response = io {
                 val hash = Security.hashPassword(req.password)
@@ -86,11 +86,18 @@ fun Route.publisherRoutes(config: AppConfig, store: Store, limiter: RateLimiter)
             val ip = call.clientIp(config.trustProxy)
             val req = call.body<PublisherLoginRequest>()
             val email = req.email.trim().lowercase()
+            if (email.length > MAX_LOGIN_IDENTIFIER || req.password.length > MAX_LOGIN_PASSWORD) {
+                throw ApiException(HttpStatusCode.Unauthorized, "invalid_credentials", "E-mail ou mot de passe incorrect.")
+            }
             if (!limiter.allow("pub-login-ip:$ip", 30, 900_000) || !limiter.allow("pub-login-id:$email", 10, 900_000)) throw tooMany()
             val response = io {
                 val found = store.findPublisherLogin(email)
-                if (found == null || !Security.verifyPassword(req.password, found.second)) {
+                val ok = Security.verifyPassword(req.password, found?.second?.takeIf { it.isNotEmpty() } ?: dummyHash)
+                if (found == null || !ok) {
                     throw ApiException(HttpStatusCode.Unauthorized, "invalid_credentials", "E-mail ou mot de passe incorrect.")
+                }
+                if (Security.needsRehash(found.second)) {
+                    runCatching { store.updatePublisherPasswordHash(UUID.fromString(found.first.id), Security.hashPassword(req.password)) }
                 }
                 issue(found.first)
             }
@@ -119,9 +126,8 @@ fun Route.publisherRoutes(config: AppConfig, store: Store, limiter: RateLimiter)
             val p = call.publisherAuth(store)
             if (p.status != "contract_ready") throw conflict("not_signable", "Le contrat n'est pas à signer pour le moment.")
             val req = call.body<SignContractRequest>()
-            val name = req.signedName.trim()
             if (!req.accept) throw badRequest("not_accepted", "Coche « Lu et approuvé » pour signer.")
-            if (name.length !in 2..80) throw badRequest("invalid_name", "Saisis ton nom complet (2 à 80 caractères).")
+            val name = Validation.line(req.signedName, 2, 80, "invalid_name", "Ton nom complet")
             val text = Contract.render(p)
             val sha = Security.sha256Hex(text)
             if (!Security.constantTimeEquals(req.sha256.lowercase(), sha)) {
@@ -157,7 +163,9 @@ fun Route.publisherRoutes(config: AppConfig, store: Store, limiter: RateLimiter)
             if (owner != null && owner.second !in setOf("draft", "rejected")) {
                 throw conflict("locked", "Ce jeu est en cours de validation ou déjà publié : il ne peut plus être modifié ici.")
             }
-            io { store.saveGameForPartner(UUID.fromString(p.id), clean) }
+            // La vérification ci-dessus donne des messages clairs ; c'est cette requête unique qui fait foi (aucune course possible).
+            val saved = io { store.saveGameForPartner(UUID.fromString(p.id), clean) }
+            if (!saved) throw conflict("locked", "Ce jeu n'est pas modifiable (identifiant déjà pris, en validation ou publié).")
             call.respond(clean)
         }
 

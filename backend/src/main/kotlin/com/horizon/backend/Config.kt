@@ -12,7 +12,7 @@ data class AppConfig(
     val seedDemo: Boolean,
     /** true derrière un reverse proxy (Caddy) : l'adresse du client vient de X-Forwarded-For. */
     val trustProxy: Boolean,
-    /** Tant qu'aucun service d'e-mail n'est branché, les codes de vérification sont écrits dans les logs du serveur. */
+    /** Test seulement (LOG_CODES=true) : les codes de vérification e-mail sont écrits dans les logs du serveur. */
     val logVerificationCodes: Boolean,
     /** Secret des notifications signées du fournisseur de test ; absent ou court : notifications désactivées. */
     val sandboxWebhookSecret: String? = null
@@ -34,7 +34,8 @@ data class AppConfig(
             sessionDays = env["SESSION_DAYS"]?.toLongOrNull()?.coerceIn(1, 365) ?: 30,
             seedDemo = env["SEED_DEMO"]?.lowercase() == "true",
             trustProxy = env["TRUST_PROXY"]?.lowercase() == "true",
-            logVerificationCodes = env["LOG_CODES"]?.lowercase() != "false",
+            // Désactivé par défaut : un code écrit dans les logs permet à quiconque lit les logs de valider n'importe quelle adresse.
+            logVerificationCodes = env["LOG_CODES"]?.lowercase() == "true",
             sandboxWebhookSecret = env["SANDBOX_WEBHOOK_SECRET"]?.takeIf { it.length >= 24 }
         )
     }

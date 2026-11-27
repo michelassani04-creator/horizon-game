@@ -28,7 +28,7 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       SEED_DEMO: ${SEED_DEMO:-false}
       SESSION_DAYS: ${SESSION_DAYS:-30}
-      LOG_CODES: ${LOG_CODES:-true}
+      LOG_CODES: ${LOG_CODES:-false}
       TRUST_PROXY: ${TRUST_PROXY:-false}
     # Sans HTTPS (tests) : accessible sur le port 8080.
     # Avec le profil "https", seul Caddy est exposé : mettez alors "127.0.0.1:8080:8080".

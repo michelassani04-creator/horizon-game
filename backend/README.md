@@ -19,9 +19,9 @@ API HORIZON ID + HORIZON Store. Kotlin · Ktor · PostgreSQL · Docker.
 | `GET /admin` | **Page d'administration** (publier, modifier, supprimer des jeux depuis le téléphone ; demande le `ADMIN_TOKEN`) |
 | `GET /v1/admin/games` · `PUT/DELETE /v1/admin/games/{id}` · `GET /v1/admin/stats` | API d'administration (en-tête `X-Admin-Token`) |
 
-Authentification : en-tête `Authorization: Bearer <jeton>`. Les jetons sont opaques, révocables, et seul leur hachage est stocké. Mots de passe : PBKDF2-SHA256 (120 000 itérations). Limitation de débit sur l'inscription, la connexion et les codes.
+Authentification : en-tête `Authorization: Bearer <jeton>`. Les jetons sont opaques, révocables, et seul leur hachage est stocké. Mots de passe : PBKDF2-SHA256 (600 000 itérations ; les anciens hachages sont mis à niveau à la connexion). Limitation de débit sur l'inscription, la connexion et les codes.
 
-Le SMS n'est pas actif : le téléphone est enregistré, sa vérification répond « non disponible » (`501`). Tant qu'aucun service d'e-mail n'est branché, le code e-mail est écrit dans les logs du serveur (`LOG_CODES=true`).
+Le SMS n'est pas actif : le téléphone est enregistré, sa vérification répond « non disponible » (`501`). Tant qu'aucun service d'e-mail n'est branché, la vérification e-mail n'est utilisable qu'en test : `LOG_CODES=true` écrit les codes dans les logs (désactivé par défaut, car quiconque lit les logs pourrait valider n'importe quelle adresse).
 
 ## Lancer sur un serveur (Linux avec Docker)
 
