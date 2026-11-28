@@ -8,6 +8,9 @@ plugins {
 val horizonApiUrl: String = listOf(project.findProperty("HORIZON_API_URL") as String?, System.getenv("HORIZON_API_URL"))
     .firstOrNull { !it.isNullOrBlank() }?.trim()?.trimEnd('/') ?: ""
 
+// Signature de release : lue dans des variables d'environnement (secrets GitHub). Sans elles, le build release n'est pas signé.
+val releaseStoreFile = System.getenv("HORIZON_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "com.horizon.game"
     compileSdk = 34
@@ -21,8 +24,20 @@ android {
         buildConfigField("String", "API_URL", "\"$horizonApiUrl\"")
     }
 
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = System.getenv("HORIZON_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("HORIZON_KEY_ALIAS")
+                keyPassword = System.getenv("HORIZON_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseStoreFile != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
